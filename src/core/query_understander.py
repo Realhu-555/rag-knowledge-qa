@@ -1,4 +1,6 @@
 """查询理解"""
+import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -67,9 +69,6 @@ class QueryUnderstander:
             )
 
             result_text = response.choices[0].message.content
-
-            import json
-            import re
 
             json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
             if json_match:
