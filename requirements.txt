@@ -1,0 +1,15 @@
+langchain>=0.2
+langchain-community
+chromadb>=0.5
+sentence-transformers
+rank-bm25
+openai
+python-dotenv
+fastapi
+uvicorn
+python-multipart
+gradio
+python-docx
+pdfplumber
+Pillow
+tiktoken
