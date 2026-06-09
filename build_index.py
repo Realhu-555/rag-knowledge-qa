@@ -23,7 +23,7 @@ def build_index():
 
     # 1. 加载所有md文件
     print("\n[1/4] 加载Markdown文件...")
-    md_files = list(DATA_DIR.glob("*.md"))
+    md_files = list(DATA_DIR.rglob("*.md"))
     print(f"找到 {len(md_files)} 个md文件")
 
     all_chunks = []
