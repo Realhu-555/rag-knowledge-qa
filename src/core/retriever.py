@@ -59,9 +59,10 @@ class HybridRetriever:
 
     def build_bm25_index(self, documents: list[str]):
         """构建BM25索引"""
+        import jieba
         from rank_bm25 import BM25Okapi
-        # 简单的中文分词（按字符）
-        tokenized_docs = [list(doc) for doc in documents]
+        # 使用jieba中文分词
+        tokenized_docs = [list(jieba.cut(doc)) for doc in documents]
         self.bm25_index = BM25Okapi(tokenized_docs)
         self.bm25_docs = documents
 
@@ -100,8 +101,8 @@ class HybridRetriever:
         if self.bm25_index is None:
             return []
 
-        # 简单的中文分词
-        tokenized_query = list(query)
+        import jieba
+        tokenized_query = list(jieba.cut(query))
         scores = self.bm25_index.get_scores(tokenized_query)
 
         # 获取top_k结果

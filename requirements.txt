@@ -3,6 +3,7 @@ langchain-community
 chromadb>=0.5
 sentence-transformers
 rank-bm25
+jieba
 openai
 python-dotenv
 fastapi
