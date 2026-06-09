@@ -68,11 +68,12 @@ class RAGEngine:
             results = self.retriever.retrieve(q, top_k)
             all_results.extend(results)
 
-        # 去重（按内容前100字符判断）
+        # 去重（用hash）
+        import hashlib
         seen = set()
         unique_results = []
         for result in all_results:
-            key = result.content[:100]
+            key = hashlib.md5(result.content.encode()).hexdigest()
             if key not in seen:
                 seen.add(key)
                 unique_results.append(result)
