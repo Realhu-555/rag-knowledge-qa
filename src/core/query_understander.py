@@ -55,37 +55,38 @@ class QueryUnderstander:
 2. 实体包括人名、地名、专业术语等
 3. 意图要简洁明了"""
 
-        response = self.client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": "你是一个查询分析专家。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=LLM_TEMPERATURE,
-            max_tokens=500
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": "你是一个查询分析专家。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=LLM_TEMPERATURE,
+                max_tokens=500
+            )
 
-        result_text = response.choices[0].message.content
+            result_text = response.choices[0].message.content
 
-        # 解析JSON（简单处理）
-        import json
-        import re
+            import json
+            import re
 
-        # 提取JSON部分
-        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-        if json_match:
-            try:
-                result = json.loads(json_match.group())
-                return QueryExpansion(
-                    original_query=query,
-                    expanded_queries=result.get("expanded_queries", [query]),
-                    entities=result.get("entities", []),
-                    intent=result.get("intent", "")
-                )
-            except json.JSONDecodeError:
-                pass
+            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group())
+                    return QueryExpansion(
+                        original_query=query,
+                        expanded_queries=result.get("expanded_queries", [query]),
+                        entities=result.get("entities", []),
+                        intent=result.get("intent", "")
+                    )
+                except json.JSONDecodeError:
+                    pass
 
-        # 解析失败，返回原始查询
+        except Exception:
+            pass
+
         return QueryExpansion(
             original_query=query,
             expanded_queries=[query],
@@ -106,14 +107,17 @@ class QueryUnderstander:
 2. 包含可能相关的关键词和信息
 3. 长度约100-200字"""
 
-        response = self.client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": "你是一个文档生成专家。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=LLM_TEMPERATURE,
-            max_tokens=300
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": "你是一个文档生成专家。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=LLM_TEMPERATURE,
+                max_tokens=300
+            )
+            return response.choices[0].message.content
 
-        return response.choices[0].message.content
+        except Exception:
+            return query

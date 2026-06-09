@@ -28,28 +28,33 @@ class Generator:
         """生成回答"""
         self._init_client()
 
-        # 构建prompt
         prompt = self._build_prompt(question, sources)
 
-        # 调用LLM
-        response = self.client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": "你是知识库问答助手。请严格基于参考资料回答。"},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=LLM_TEMPERATURE,
-            max_tokens=LLM_MAX_TOKENS
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": "你是知识库问答助手。请严格基于参考资料回答。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=LLM_TEMPERATURE,
+                max_tokens=LLM_MAX_TOKENS
+            )
 
-        answer = response.choices[0].message.content
-        usage = {
-            "prompt_tokens": response.usage.prompt_tokens,
-            "completion_tokens": response.usage.completion_tokens,
-            "total_tokens": response.usage.total_tokens
-        }
+            answer = response.choices[0].message.content
+            usage = {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens
+            }
+            return {"answer": answer, "usage": usage}
 
-        return {"answer": answer, "usage": usage}
+        except Exception as e:
+            return {
+                "answer": "抱歉，AI服务暂时不可用，请稍后重试。",
+                "usage": {},
+                "error": str(e)
+            }
 
     def _build_prompt(self, question: str, sources: list[dict]) -> str:
         """构建prompt模板"""
