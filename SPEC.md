@@ -669,13 +669,19 @@ rag-knowledge-qa/
 
 **验证标准：** 启动FastAPI，Swagger页面能测试所有接口，鉴权和限流正常工作。
 
-### Phase 4：前端（1小时）
+### Phase 4：前端（2-3小时）
 
 方便演示。
 
-21. **Gradio界面** — 输入框/回答区/引用来源可展开/耗时统计/反馈按钮
+21. **Vue3前端** — 单页应用（不需要路由）
+    - 技术栈：Vue 3 + Vite + TypeScript + Element Plus
+    - 实时通信：WebSocket（打字机效果）
+    - 状态管理：Pinia
+    - HTTP请求：axios
+    - 暗色主题（科技感）
+    - 组件：ChatMessage、SourceCard、ChatInput、MessageFeedback、StatsBar、DocumentManager
 
-**验证标准：** 浏览器 http://localhost:7860 能问答，引用可点击展开。
+**验证标准：** 浏览器 http://localhost:5173 能问答，引用可点击展开，打字机效果正常。
 
 ### Phase 5：安全与可追溯（1小时）
 
