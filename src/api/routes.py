@@ -74,9 +74,11 @@ async def stats(
     key_info: dict = Depends(verify_api_key)
 ):
     """知识库统计"""
+    from src.config import DATA_DIR
+    total_documents = len(list(DATA_DIR.rglob("*.md")))
     total_chunks = vector_store.count()
     return StatsResponse(
-        total_documents=8,  # TODO: 动态统计
+        total_documents=total_documents,
         total_chunks=total_chunks
     )
 
