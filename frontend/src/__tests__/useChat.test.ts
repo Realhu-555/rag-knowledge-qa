@@ -54,13 +54,11 @@ describe('useChat', () => {
 
   it('handles token message', () => {
     chat.sendMessage('测试问题')
-    const assistantMessage = chat.messages.value.find(m => m.role === 'assistant')
+    const assistantMessage = chat.addAssistantMessage()
 
-    // Simulate token message
-    if (assistantMessage) {
-      assistantMessage.content = '测试回答'
-    }
+    // Simulate token message via handleToken
+    chat.handleToken(assistantMessage.id, '测试回答')
 
-    expect(assistantMessage?.content).toBe('测试回答')
+    expect(assistantMessage.content).toBe('测试回答')
   })
 })
