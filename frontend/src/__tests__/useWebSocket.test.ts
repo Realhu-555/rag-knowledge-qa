@@ -4,7 +4,7 @@ import { useWebSocket } from '../composables/useWebSocket'
 // Mock WebSocket
 let mockWebSocket: any
 
-const MockWebSocket = vi.fn(() => mockWebSocket)
+const MockWebSocket = vi.fn(() => mockWebSocket) as any
 MockWebSocket.OPEN = 1
 MockWebSocket.CLOSED = 3
 vi.stubGlobal('WebSocket', MockWebSocket)
