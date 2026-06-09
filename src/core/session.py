@@ -29,9 +29,15 @@ class SessionManager:
     def __init__(self, timeout_minutes: int = SESSION_TIMEOUT_MINUTES):
         self.sessions: dict[str, Session] = {}
         self.timeout_seconds = timeout_minutes * 60
+        self._last_cleanup = time.time()
 
     def get_or_create_session(self, session_id: str) -> Session:
         """获取或创建会话"""
+        # 每5分钟自动清理一次过期会话
+        if time.time() - self._last_cleanup > 300:
+            self.cleanup_expired()
+            self._last_cleanup = time.time()
+
         if session_id not in self.sessions:
             self.sessions[session_id] = Session(session_id=session_id)
 
