@@ -13,8 +13,8 @@
 - **关键词检索**: rank_bm25
 - **ReRanker**: sentence-transformers CrossEncoder
 - **文档处理**: LangChain、python-docx、pdfplumber
-- **Web前端**: Gradio
-- **API服务**: FastAPI + uvicorn
+- **Web前端**: Vue 3 + Vite + TypeScript + Element Plus
+- **API服务**: FastAPI + uvicorn + WebSocket
 - **数据库**: SQLite（API Key、会话、日志）
 
 ## 项目结构
@@ -46,7 +46,17 @@ rag-knowledge-qa/
 ├── chroma_db/             # ChromaDB持久化（git忽略）
 ├── images/                # 图片存储
 ├── evaluation/            # 评测集
-├── app.py                 # Gradio前端
+├── frontend/              # Vue 3 前端
+│   ├── src/
+│   │   ├── components/    # Vue组件
+│   │   ├── composables/   # 组合式函数
+│   │   ├── stores/        # Pinia状态
+│   │   ├── types/         # TypeScript类型
+│   │   └── styles/        # 样式
+│   ├── index.html
+│   ├── vite.config.ts
+│   └── package.json
+├── app.py                 # Gradio前端（调试用，可选）
 ├── main.py                # FastAPI启动入口
 ├── build_index.py         # 构建向量索引
 ├── manage_keys.py         # API Key管理
@@ -85,13 +95,21 @@ uv pip install -r requirements.txt
 # 构建索引
 python build_index.py
 
-# 启动Gradio前端
+# 启动Gradio前端（调试用）
 python app.py
 
 # 启动API服务
 python main.py
 # 或
 uvicorn src.web.server:app --host 0.0.0.0 --port 8080
+
+# 前端开发
+cd frontend
+npm install
+npm run dev              # 本地开发 http://localhost:5173
+
+# 前端生产构建
+npm run build            # 输出到 frontend/dist/
 
 # 代码检查
 ruff check src/ tests/
