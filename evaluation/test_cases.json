@@ -1,0 +1,32 @@
+[
+  {
+    "id": "001",
+    "question": "什么是RAG？",
+    "expected_keywords": ["检索", "增强", "生成"],
+    "category": "概念理解"
+  },
+  {
+    "id": "002",
+    "question": "如何构建向量索引？",
+    "expected_keywords": ["embedding", "向量", "索引"],
+    "category": "操作指南"
+  },
+  {
+    "id": "003",
+    "question": "ChromaDB是什么？",
+    "expected_keywords": ["向量", "数据库"],
+    "category": "工具介绍"
+  },
+  {
+    "id": "004",
+    "question": "DeepSeek API如何调用？",
+    "expected_keywords": ["API", "调用"],
+    "category": "API使用"
+  },
+  {
+    "id": "005",
+    "question": "什么是Embedding？",
+    "expected_keywords": ["向量化", "文本"],
+    "category": "概念理解"
+  }
+]
