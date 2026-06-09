@@ -54,9 +54,24 @@ class RAGEngine:
             expanded_queries = expansion.expanded_queries
             entities = expansion.entities
 
+        # HyDE：用假设回答做向量检索
+        hyde_results = []
         if self.use_hyde:
-            hyde_query = self.query_understander.generate_hyde(question)
-            expanded_queries.append(hyde_query)
+            hyde_text = self.query_understander.generate_hyde(question)
+            hyde_embedding = self.embedder.embed_single(hyde_text)
+            hyde_retrieval = self.vector_store.query(
+                query_embedding=hyde_embedding,
+                n_results=top_k
+            )
+            if hyde_retrieval and hyde_retrieval.get("documents"):
+                from src.core.retriever import RetrievalResult
+                for i, doc in enumerate(hyde_retrieval["documents"][0]):
+                    metadata = hyde_retrieval["metadatas"][0][i] if hyde_retrieval.get("metadatas") else {}
+                    hyde_results.append(RetrievalResult(
+                        content=doc,
+                        metadata=metadata,
+                        score=0.5
+                    ))
 
         timing["query_understanding_ms"] = round((time.time() - query_start) * 1000, 2)
 
@@ -67,6 +82,9 @@ class RAGEngine:
         for q in expanded_queries:
             results = self.retriever.retrieve(q, top_k)
             all_results.extend(results)
+
+        # 合并HyDE检索结果
+        all_results.extend(hyde_results)
 
         # 去重（用hash）
         import hashlib
