@@ -180,6 +180,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
         print(f"WebSocket错误: {e}")
 
 
+# M9: 启动评测定时任务
+try:
+    from src.core.eval_scheduler import start_scheduler
+    eval_scheduler = start_scheduler()
+except Exception as e:
+    logger.warning("评测调度器启动失败: %s", e)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=API_HOST, port=API_PORT)

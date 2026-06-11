@@ -30,7 +30,7 @@ from src.core.metrics import metrics
 from src.core.tracer import get_trace, list_recent_traces
 from src.core.alert_manager import alert_manager
 from src.api.logging_config import log_request, request_id_ctx, logger
-from src.config import USE_QUERY_EXPANSION, USE_HYDE, USE_RERANKER, ALLOW_REGISTRATION
+from src.config import USE_QUERY_EXPANSION, USE_HYDE, USE_RERANKER, ALLOW_REGISTRATION, USE_CONVERSATION_SUMMARY
 
 router = APIRouter(prefix="/api/v1")
 
@@ -186,8 +186,13 @@ async def query(
     session_manager.add_message(session_id, "user", req.question)
     history = session_manager.get_history(session_id)[:-1]
 
+    # M8: 获取对话摘要
+    summary = ""
+    if USE_CONVERSATION_SUMMARY:
+        summary = session_manager.get_summary(session_id)
+
     response = rag_engine.query(req.question, top_k=req.top_k, history=history,
-                                  user_id=user["id"])
+                                  summary=summary, user_id=user["id"])
     session_manager.add_message(session_id, "assistant", response.answer)
 
     sources = [
@@ -205,7 +210,11 @@ async def query(
     log_audit(
         user["id"], "query", "knowledge_base",
         req.kb_id or "default",
-        details=json.dumps({"question": req.question}, ensure_ascii=False),
+        details=json.dumps({
+            "question": req.question,
+            "intent": response.intent,
+            "is_followup": response.is_followup,
+        }, ensure_ascii=False),
         ip_address=_get_client_ip(request) if request else "",
     )
 
@@ -245,6 +254,30 @@ async def submit_feedback(
         ip_address=_get_client_ip(request) if request else "",
     )
     return {"id": feedback_id, "message": "反馈已记录"}
+
+
+# ===================================================================
+# M8: 对话导出
+# ===================================================================
+
+@router.get("/sessions/{session_id}/export")
+async def export_session(
+    session_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """导出对话记录为Markdown格式"""
+    session = session_manager.get_or_create_session(session_id)
+    if not session.messages:
+        raise HTTPException(status_code=404, detail="会话不存在或无消息")
+
+    markdown = session_manager.export_session_markdown(session_id)
+    return Response(
+        content=markdown,
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="session_{session_id}.md"',
+        },
+    )
 
 
 # ===================================================================
@@ -387,3 +420,57 @@ async def get_alerts(
     # 先触发一次检查
     alert_manager.check_all()
     return metrics.get_recent_alerts(limit=limit)
+
+
+# ===================================================================
+# M9: 评测接口
+# ===================================================================
+
+@router.get("/evaluations")
+async def list_evaluations(
+    user: dict = Depends(require_role("admin")),
+    limit: int = 20,
+):
+    """列出历史评测记录"""
+    from src.storage.database import list_evaluations
+    return list_evaluations(limit=limit)
+
+
+@router.get("/evaluations/latest")
+async def get_latest_evaluation(
+    user: dict = Depends(require_role("admin")),
+):
+    """获取最近一次评测结果"""
+    from src.storage.database import get_latest_evaluation
+    result = get_latest_evaluation()
+    if result is None:
+        raise HTTPException(status_code=404, detail="暂无评测记录")
+    return result
+
+
+@router.post("/evaluations/run")
+async def run_evaluation_now(
+    user: dict = Depends(require_role("admin")),
+    version: str = "",
+):
+    """手动触发一次评测"""
+    from evaluate import run_evaluation, save_to_database
+    summary = run_evaluation(version=version)
+    if "error" in summary:
+        raise HTTPException(status_code=500, detail=summary["error"])
+    save_to_database(summary)
+    return {k: v for k, v in summary.items() if k != "results"}
+
+
+@router.get("/evaluations/compare")
+async def compare_evaluations(
+    ver_a: str,
+    ver_b: str,
+    user: dict = Depends(require_role("admin")),
+):
+    """对比两个版本的评测结果"""
+    from evaluate import compare_evaluations
+    try:
+        return compare_evaluations(ver_a, ver_b)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
