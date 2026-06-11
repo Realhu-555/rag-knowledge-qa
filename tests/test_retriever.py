@@ -1,7 +1,10 @@
 """检索模块测试"""
 import pytest
 from unittest.mock import Mock
-from src.core.retriever import Retriever, HybridRetriever, RetrievalResult
+from src.core.retriever import Retriever, RetrievalResult
+
+jieba = pytest.importorskip("jieba")
+from src.core.retriever import HybridRetriever
 
 
 class TestRetriever:

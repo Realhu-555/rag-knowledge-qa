@@ -39,6 +39,6 @@ class TestRAGEngine:
         engine = RAGEngine()
         result = engine.query("什么是RAG？")
 
-        assert "answer" in result
-        assert "sources" in result
-        assert "timing" in result
+        assert result.answer
+        assert result.sources is not None
+        assert result.timing is not None
