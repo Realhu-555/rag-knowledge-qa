@@ -1,8 +1,9 @@
 """API路由 — JWT认证 + 多知识库 + 审计日志 + M4监控"""
 import uuid
 import json
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 
 from src.api.schemas import (
     QueryRequest, QueryResponse, Source,
@@ -302,19 +303,131 @@ async def stats(user: dict = Depends(get_current_user)):
 @router.get("/documents", response_model=DocumentListResponse)
 async def list_documents(user: dict = Depends(get_current_user)):
     """查看文档列表"""
-    return DocumentListResponse(documents=[], total=0)
+    from src.storage.database import list_documents as db_list_documents
+    records = db_list_documents()
+    documents = [
+        DocumentInfo(
+            id=r.id,
+            filename=r.filename,
+            chunks=r.chunk_count,
+            indexed_at=r.indexed_at,
+        )
+        for r in records
+    ]
+    return DocumentListResponse(documents=documents, total=len(documents))
 
 
 @router.post("/documents/upload", response_model=UploadResponse)
-async def upload_document(user: dict = Depends(require_role("editor"))):
-    """上传文档"""
-    return UploadResponse(success=False, message="功能尚未实现")
+async def upload_document(
+    file: UploadFile = File(...),
+    user: dict = Depends(require_role("editor")),
+):
+    """上传文档并触发增量索引"""
+    from src.config import DATA_DIR, MAX_UPLOAD_SIZE_MB, ALLOWED_FILE_TYPES
+    import hashlib
+
+    # 校验文件类型
+    suffix = Path(file.filename).suffix.lower() if file.filename else ""
+    if suffix not in ALLOWED_FILE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型: {suffix}，允许: {', '.join(ALLOWED_FILE_TYPES)}",
+        )
+
+    # 读取并校验大小
+    content = await file.read()
+    max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件过大，最大允许 {MAX_UPLOAD_SIZE_MB}MB",
+        )
+
+    # 保存到 data/
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    save_path = DATA_DIR / file.filename
+    save_path.write_bytes(content)
+
+    # 计算 hash 并注册文档
+    file_hash = hashlib.md5(content).hexdigest()
+    doc_id = uuid.uuid4().hex
+    from src.storage.database import init_db, upsert_document
+    from src.storage.models import DocumentRecord
+
+    init_db()
+    doc = DocumentRecord(
+        id=doc_id,
+        filename=file.filename,
+        file_path=str(save_path),
+        file_hash=file_hash,
+        file_type=suffix,
+        file_size=len(content),
+        status="pending",
+    )
+    upsert_document(doc)
+
+    # 触发增量索引（仅索引刚上传的文件）
+    try:
+        from src.core.incremental_indexer import IncrementalIndexer
+        indexer = IncrementalIndexer()
+        indexer._add_file(save_path)
+        doc.status = "indexed"
+        doc.indexed_at = DocumentRecord.now()
+        doc.updated_at = doc.indexed_at
+        upsert_document(doc)
+    except Exception as e:
+        doc.status = "error"
+        doc.error_message = str(e)[:500]
+        upsert_document(doc)
+        return UploadResponse(
+            success=False,
+            message=f"文件已保存但索引失败: {e}",
+            document_id=doc_id,
+        )
+
+    log_audit(user["id"], "upload_document", "document", doc_id,
+              details=json.dumps({"filename": file.filename}, ensure_ascii=False))
+
+    return UploadResponse(
+        success=True,
+        message=f"上传成功，已索引为 {doc.chunk_count} 个chunk",
+        document_id=doc_id,
+    )
 
 
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: str, user: dict = Depends(require_role("editor"))):
-    """删除文档"""
-    raise HTTPException(status_code=501, detail="功能尚未实现")
+    """删除文档（向量库 + 磁盘文件 + 数据库记录）"""
+    from src.storage.database import get_document as db_get_document, delete_document as db_delete_document
+
+    doc = db_get_document(document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    # 从向量库删除该文件的所有 chunk
+    try:
+        all_data = vector_store.get_all()
+        ids_to_delete = []
+        for i, metadata in enumerate(all_data.get("metadatas", [])):
+            if metadata.get("source_file", "") == doc.filename:
+                ids_to_delete.append(all_data["ids"][i])
+        if ids_to_delete:
+            vector_store.delete(ids=ids_to_delete)
+    except Exception:
+        pass  # 向量库中可能没有数据，忽略
+
+    # 删除磁盘文件
+    file_path = Path(doc.file_path)
+    if file_path.exists():
+        file_path.unlink()
+
+    # 删除数据库记录
+    db_delete_document(document_id)
+
+    log_audit(user["id"], "delete_document", "document", document_id,
+              details=json.dumps({"filename": doc.filename}, ensure_ascii=False))
+
+    return {"success": True, "message": f"已删除文档: {doc.filename}"}
 
 
 @router.post("/index/scan")
