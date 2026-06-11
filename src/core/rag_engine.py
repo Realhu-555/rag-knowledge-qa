@@ -1,4 +1,4 @@
-"""RAG引擎 — 串联所有模块 + M4链路追踪/指标"""
+"""RAG引擎 — 串联所有模块 + M4链路追踪/指标 + M8对话增强"""
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -14,6 +14,11 @@ from src.core.metrics import metrics
 from src.api.logging_config import log_retrieval, log_llm_call
 from src.config import RETRIEVAL_TOP_K, USE_HYBRID_RETRIEVAL, RELEVANCE_THRESHOLD
 from src.core.query_cache import QueryCache
+from src.config import (
+    USE_CONVERSATION_SUMMARY,
+    USE_INTENT_CLASSIFICATION,
+    FOLLOWUP_SCORE_THRESHOLD,
+)
 
 
 @dataclass
@@ -25,6 +30,8 @@ class RAGResponse:
     timing: dict = field(default_factory=dict)
     query_expansion: dict = field(default_factory=dict)
     trace_id: str = ""
+    is_followup: bool = False  # M8: 是否为主动追问
+    intent: str = "query"     # M8: 意图类型
 
 
 class RAGEngine:
@@ -52,6 +59,51 @@ class RAGEngine:
         # M5: 查询缓存
         self.query_cache = QueryCache()
 
+        # M8: 意图识别
+        self._intent_classifier = None
+
+    def _get_intent_classifier(self):
+        """懒加载意图分类器"""
+        if self._intent_classifier is None:
+            from src.core.intent_classifier import IntentClassifier
+            self._intent_classifier = IntentClassifier()
+        return self._intent_classifier
+
+    def _generate_followup(self, question: str) -> str:
+        """生成主动追问回复"""
+        self.generator._init_client()
+        prompt = (
+            f"用户问了一个问题：{question}\n"
+            "但知识库中没有找到足够相关的信息来回答。\n"
+            "请用友好的语气引导用户提供更具体的信息。"
+            "例如：'您能再具体描述一下您想了解的方面吗？' 或 "
+            "'您能否提供更多细节，比如具体的技术名称或场景？'\n"
+            "只输出追问语句，不要加多余的解释。"
+        )
+        try:
+            from src.config import DEEPSEEK_MODEL
+            response = self.generator.client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=150,
+            )
+            return response.choices[0].message.content.strip()
+        except Exception:
+            return "您能再具体描述一下您想了解的内容吗？这样我能更准确地帮您查找。"
+
+    def classify_intent(self, question: str, has_history: bool = False) -> str:
+        """M8: 识别用户意图
+
+        Returns:
+            意图字符串: "query" / "followup" / "chitchat" / "feedback"
+        """
+        if not USE_INTENT_CLASSIFICATION:
+            return "query"
+        classifier = self._get_intent_classifier()
+        result = classifier.classify(question, has_history)
+        return result.intent.value
+
     def _build_bm25_index(self):
         """从向量库加载所有文档，构建BM25索引"""
         if not isinstance(self.retriever, HybridRetriever):
@@ -70,6 +122,7 @@ class RAGEngine:
 
     def query(self, question: str, top_k: int = RETRIEVAL_TOP_K,
               history: list[dict] | None = None,
+              summary: str = "",
               user_id: str = "") -> RAGResponse:
         """执行RAG问答
 
@@ -77,18 +130,50 @@ class RAGEngine:
             question: 用户问题
             top_k: 检索结果数量
             history: 对话历史，注入LLM用于多轮上下文
+            summary: M8: 对话摘要
             user_id: 调用用户ID（用于trace）
         """
         # ---- M4: 启动 trace ----
         trace = Trace(question, user_id=user_id)
         metrics.inc_counter("total_queries")
 
+        # ---- M8: 意图识别 ----
+        has_history = bool(history)
+        intent = self.classify_intent(question, has_history)
+
+        if intent == "chitchat":
+            # 闲聊：不走RAG，直接LLM回答
+            result = self.generator.generate(
+                question, sources=[], history=history, summary=summary,
+            )
+            return RAGResponse(
+                answer=result["answer"],
+                sources=[],
+                usage=result.get("usage", {}),
+                timing={"total_ms": 0},
+                trace_id=trace.trace_id,
+                intent="chitchat",
+            )
+
+        if intent == "feedback":
+            # 反馈：记录并给出友好提示
+            return RAGResponse(
+                answer="感谢您的反馈！我会努力改进回答质量。请问还有其他问题吗？",
+                sources=[],
+                usage={},
+                timing={"total_ms": 0},
+                trace_id=trace.trace_id,
+                intent="feedback",
+            )
+
         # ---- M5: 缓存命中检查 ----
         cached = self.query_cache.get(question, top_k)
         if cached is not None:
             sources = [s for s in cached if s.get("score", 0) >= RELEVANCE_THRESHOLD]
             if sources:
-                answer = self.generator.generate(question, sources, history=history)["answer"]
+                answer = self.generator.generate(
+                    question, sources, history=history, summary=summary,
+                )["answer"]
             else:
                 answer = "知识库中未找到相关信息"
             return RAGResponse(
@@ -97,6 +182,7 @@ class RAGEngine:
                 usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
                 timing={"total_ms": 0, "cached": True},
                 trace_id=trace.trace_id,
+                intent=intent,
             )
 
         start_time = time.time()
@@ -192,6 +278,7 @@ class RAGEngine:
             })
 
             # 3.5 M5: 阈值过滤
+            pre_filter_count = len(final_results)
             final_results = [r for r in final_results if r.score >= RELEVANCE_THRESHOLD]
 
             # 4. 准备sources
@@ -203,6 +290,24 @@ class RAGEngine:
                     "score": result.score
                 })
 
+            # ---- M8: 主动追问检测 ----
+            # 所有chunk分数都低于阈值（或过滤后无结果），且过滤前有结果说明检索到了但不相关
+            is_followup = False
+            if not sources and pre_filter_count > 0:
+                # 检索到了结果但全部低于阈值 → 可能需要追问
+                max_score = max(r.score for r in final_results) if final_results else 0
+                if max_score < FOLLOWUP_SCORE_THRESHOLD and has_history:
+                    followup_answer = self._generate_followup(question)
+                    return RAGResponse(
+                        answer=followup_answer,
+                        sources=[],
+                        usage={},
+                        timing=timing,
+                        trace_id=trace.trace_id,
+                        is_followup=True,
+                        intent=intent,
+                    )
+
             # 5. 生成
             span = trace.start_span("generation")
             generation_start = time.time()
@@ -210,7 +315,9 @@ class RAGEngine:
                 answer = "知识库中未找到相关信息"
                 usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
             else:
-                result = self.generator.generate(question, sources, history=history)
+                result = self.generator.generate(
+                    question, sources, history=history, summary=summary,
+                )
                 answer = result["answer"]
                 usage = result["usage"]
                 # LLM调用日志
@@ -248,6 +355,7 @@ class RAGEngine:
                     "hyde_query": hyde_query
                 },
                 trace_id=trace.trace_id,
+                intent=intent,
             )
 
         except Exception as e:
