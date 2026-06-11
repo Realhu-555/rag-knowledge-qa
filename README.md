@@ -17,7 +17,7 @@
 
 | 组件 | 技术 |
 |------|------|
-| LLM | DeepSeek API（兼容 OpenAI 格式） |
+| LLM | DeepSeek / OpenAI / Anthropic Claude（可切换） |
 | Embedding | sentence-transformers all-MiniLM-L6-v2 |
 | 向量数据库 | ChromaDB（本地持久化） |
 | 关键词检索 | rank_bm25 + jieba 中文分词 |
@@ -117,11 +117,16 @@ rag-knowledge-qa/
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
+| LLM_PROVIDER | deepseek | LLM提供商：deepseek/openai/anthropic |
+| OPENAI_API_KEY | - | OpenAI兼容API密钥（DeepSeek等） |
+| OPENAI_BASE_URL | https://api.deepseek.com | API地址 |
+| OPENAI_MODEL | deepseek-chat | 模型名 |
+| ANTHROPIC_API_KEY | - | Anthropic Claude密钥 |
+| ANTHROPIC_MODEL | claude-sonnet-4-20250514 | Claude模型名 |
 | CHUNK_SIZE | 800 | 切片大小 |
 | CHUNK_OVERLAP | 100 | 切片重叠 |
 | RETRIEVAL_TOP_K | 10 | 检索返回数量 |
 | USE_HYBRID_RETRIEVAL | true | 启用混合检索 |
-| RELEVANCE_THRESHOLD | 0.01 | 相关性阈值 |
 | LLM_TEMPERATURE | 0.7 | LLM 温度 |
 | MAX_HISTORY_ROUNDS | 5 | 多轮对话保留轮数 |
 

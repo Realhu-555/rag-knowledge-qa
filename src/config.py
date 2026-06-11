@@ -14,10 +14,22 @@ DATA_DIR = BASE_DIR / "data"
 CHROMA_DB_DIR = BASE_DIR / "chroma_db"
 IMAGES_DIR = BASE_DIR / "images"
 
-# DeepSeek API配置
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+# LLM提供商配置
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek")  # deepseek/openai/anthropic
+
+# OpenAI兼容API配置（DeepSeek/通义千问/Moonshot/本地Ollama等）
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", os.getenv("DEEPSEEK_API_KEY", ""))
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", os.getenv("DEEPSEEK_MODEL", "deepseek-chat"))
+
+# Anthropic Claude配置
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+
+# 兼容旧配置（deprecated，优先用上面的）
+DEEPSEEK_API_KEY = OPENAI_API_KEY
+DEEPSEEK_BASE_URL = OPENAI_BASE_URL
+DEEPSEEK_MODEL = OPENAI_MODEL
 
 # Embedding配置
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")  # local 或 api

@@ -1,28 +1,34 @@
-"""LLM生成"""
-from openai import OpenAI
+"""LLM生成 — 支持OpenAI兼容API和Anthropic Claude"""
 
 from src.config import (
-    DEEPSEEK_API_KEY,
-    DEEPSEEK_BASE_URL,
-    DEEPSEEK_MODEL,
+    LLM_PROVIDER,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+    OPENAI_MODEL,
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL,
     LLM_TEMPERATURE,
     LLM_MAX_TOKENS,
 )
 
 
 class Generator:
-    """LLM回答生成器"""
+    """LLM回答生成器，支持多提供商"""
 
     def __init__(self):
         self.client = None
 
     def _init_client(self):
-        """初始化DeepSeek客户端"""
-        if self.client is None:
-            self.client = OpenAI(
-                api_key=DEEPSEEK_API_KEY,
-                base_url=DEEPSEEK_BASE_URL
-            )
+        """初始化LLM客户端"""
+        if self.client is not None:
+            return
+
+        if LLM_PROVIDER == "anthropic":
+            import anthropic
+            self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        else:
+            from openai import OpenAI
+            self.client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
 
     def generate(self, question: str, sources: list[dict],
                   history: list[dict] | None = None,
@@ -33,7 +39,7 @@ class Generator:
             question: 用户当前问题
             sources: 检索到的参考资料列表
             history: 对话历史，格式 [{"role": "user/assistant", "content": "..."}]
-            summary: M8: 对话摘要，注入system message
+            summary: 对话摘要，注入system message
         """
         self._init_client()
 
@@ -49,29 +55,17 @@ class Generator:
         if summary:
             system_content += f"\n\n之前对话的摘要：\n{summary}"
 
-        # 构建消息列表：系统提示 + 历史对话 + 当前问题
-        messages = [
-            {"role": "system", "content": system_content},
-        ]
+        # 构建消息列表：历史对话 + 当前问题
+        messages = []
         if history:
             messages.extend(history)
         messages.append({"role": "user", "content": prompt})
 
         try:
-            response = self.client.chat.completions.create(
-                model=DEEPSEEK_MODEL,
-                messages=messages,
-                temperature=LLM_TEMPERATURE,
-                max_tokens=LLM_MAX_TOKENS
-            )
-
-            answer = response.choices[0].message.content
-            usage = {
-                "prompt_tokens": response.usage.prompt_tokens,
-                "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens
-            }
-            return {"answer": answer, "usage": usage}
+            if LLM_PROVIDER == "anthropic":
+                return self._call_anthropic(system_content, messages)
+            else:
+                return self._call_openai(system_content, messages)
 
         except Exception as e:
             return {
@@ -79,6 +73,39 @@ class Generator:
                 "usage": {},
                 "error": str(e)
             }
+
+    def _call_openai(self, system_content: str, messages: list[dict]) -> dict:
+        """调用OpenAI兼容API"""
+        response = self.client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[{"role": "system", "content": system_content}] + messages,
+            temperature=LLM_TEMPERATURE,
+            max_tokens=LLM_MAX_TOKENS
+        )
+        answer = response.choices[0].message.content
+        usage = {
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens
+        }
+        return {"answer": answer, "usage": usage}
+
+    def _call_anthropic(self, system_content: str, messages: list[dict]) -> dict:
+        """调用Anthropic Claude API"""
+        response = self.client.messages.create(
+            model=ANTHROPIC_MODEL,
+            system=system_content,
+            messages=messages,
+            temperature=LLM_TEMPERATURE,
+            max_tokens=LLM_MAX_TOKENS
+        )
+        answer = response.content[0].text
+        usage = {
+            "prompt_tokens": response.usage.input_tokens,
+            "completion_tokens": response.usage.output_tokens,
+            "total_tokens": response.usage.input_tokens + response.usage.output_tokens
+        }
+        return {"answer": answer, "usage": usage}
 
     def _build_prompt(self, question: str, sources: list[dict]) -> str:
         """构建prompt模板"""
