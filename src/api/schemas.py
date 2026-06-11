@@ -3,14 +3,6 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 
-class QueryRequest(BaseModel):
-    """问答请求"""
-    question: str = Field(..., description="用户问题")
-    session_id: Optional[str] = Field(None, description="会话ID（多轮对话用）")
-    top_k: Optional[int] = Field(5, description="返回前几条检索结果")
-    use_hyde: Optional[bool] = Field(False, description="是否启用HyDE")
-
-
 class Source(BaseModel):
     """引用来源"""
     file: str = Field(..., description="来源文件名")
@@ -60,3 +52,69 @@ class UploadResponse(BaseModel):
     success: bool = Field(..., description="是否成功")
     message: str = Field("", description="消息")
     document_id: Optional[str] = Field(None, description="文档ID")
+
+
+# ---- 认证相关 ----
+
+class RegisterRequest(BaseModel):
+    """注册请求"""
+    username: str = Field(..., min_length=3, max_length=32, description="用户名")
+    password: str = Field(..., min_length=6, max_length=128, description="密码")
+
+
+class LoginRequest(BaseModel):
+    """登录请求"""
+    username: str = Field(..., description="用户名")
+    password: str = Field(..., description="密码")
+
+
+class TokenResponse(BaseModel):
+    """JWT Token响应"""
+    access_token: str = Field(..., description="访问Token")
+    refresh_token: str = Field(..., description="刷新Token")
+    token_type: str = Field("bearer", description="Token类型")
+    expires_in: int = Field(..., description="过期时间（秒）")
+
+
+class RefreshRequest(BaseModel):
+    """刷新Token请求"""
+    refresh_token: str = Field(..., description="刷新Token")
+
+
+# ---- 知识库相关 ----
+
+class KnowledgeBaseCreateRequest(BaseModel):
+    """创建知识库请求"""
+    name: str = Field(..., min_length=1, max_length=100, description="知识库名称")
+    description: str = Field("", description="知识库描述")
+
+
+class KnowledgeBaseResponse(BaseModel):
+    """知识库响应"""
+    id: str = Field(..., description="知识库ID")
+    name: str = Field(..., description="知识库名称")
+    description: str = Field("", description="描述")
+    owner_id: str = Field(..., description="创建者ID")
+    created_at: str = Field(..., description="创建时间")
+    document_count: int = Field(0, description="文档数")
+    chunk_count: int = Field(0, description="chunk数")
+
+
+# ---- 扩展 QueryRequest ----
+
+class QueryRequest(BaseModel):
+    """问答请求"""
+    question: str = Field(..., description="用户问题")
+    session_id: Optional[str] = Field(None, description="会话ID（多轮对话用）")
+    top_k: Optional[int] = Field(5, description="返回前几条检索结果")
+    use_hyde: Optional[bool] = Field(False, description="是否启用HyDE")
+    kb_id: Optional[str] = Field(None, description="知识库ID（不指定则用默认）")
+
+
+# ---- 反馈相关 ----
+
+class FeedbackRequest(BaseModel):
+    """用户反馈请求"""
+    request_id: str = Field(..., description="关联的请求ID（trace_id）")
+    rating: int = Field(..., description="评分: 1=赞, -1=踩")
+    query: Optional[str] = Field(None, description="原始查询文本")
