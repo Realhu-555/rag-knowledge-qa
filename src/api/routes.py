@@ -1,67 +1,255 @@
-"""API路由"""
+"""API路由 — JWT认证 + 多知识库 + 审计日志 + M4监控"""
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from src.api.schemas import (
     QueryRequest, QueryResponse, Source,
     HealthResponse, StatsResponse,
     DocumentListResponse, DocumentInfo,
-    UploadResponse
+    UploadResponse,
+    RegisterRequest, LoginRequest, TokenResponse, RefreshRequest,
+    KnowledgeBaseCreateRequest, KnowledgeBaseResponse,
+    FeedbackRequest,
 )
-from src.api.auth import verify_api_key, require_role, create_api_key
+from src.api.jwt_auth import (
+    get_current_user, require_role, log_audit,
+    hash_password, verify_password,
+    create_access_token, create_refresh_token, decode_token,
+    _get_client_ip,
+)
+from src.storage.database import (
+    create_user, get_user_by_username, update_user_login,
+    create_knowledge_base, get_knowledge_base, list_knowledge_bases,
+)
 from src.core.rag_engine import RAGEngine
 from src.core.vector_store import VectorStore
 from src.core.session import SessionManager
+from src.core.metrics import metrics
+from src.core.tracer import get_trace, list_recent_traces
+from src.core.alert_manager import alert_manager
+from src.api.logging_config import log_request, request_id_ctx, logger
+from src.config import USE_QUERY_EXPANSION, USE_HYDE, USE_RERANKER, ALLOW_REGISTRATION
 
 router = APIRouter(prefix="/api/v1")
 
 # 初始化组件
-rag_engine = RAGEngine()
+rag_engine = RAGEngine(
+    use_query_expansion=USE_QUERY_EXPANSION,
+    use_hyde=USE_HYDE,
+    use_reranker=USE_RERANKER,
+)
 vector_store = VectorStore()
 session_manager = SessionManager()
 
 
+# ===================================================================
+# 认证接口
+# ===================================================================
+
+@router.post("/auth/register", response_model=TokenResponse)
+async def register(req: RegisterRequest, request: Request):
+    """注册新用户"""
+    if not ALLOW_REGISTRATION:
+        raise HTTPException(status_code=403, detail="注册已关闭，请联系管理员")
+
+    user_id = uuid.uuid4().hex
+    password_hash = hash_password(req.password)
+    user = create_user(user_id, req.username, password_hash)
+
+    if user is None:
+        raise HTTPException(status_code=409, detail="用户名已存在")
+
+    access_token = create_access_token(user["id"], user["role"])
+    refresh_token = create_refresh_token(user["id"])
+
+    from src.config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+    log_audit(user_id, "register", "user", user_id,
+              ip_address=_get_client_ip(request))
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+@router.post("/auth/login", response_model=TokenResponse)
+async def login(req: LoginRequest, request: Request):
+    """登录获取JWT Token"""
+    user = get_user_by_username(req.username)
+    if user is None or not verify_password(req.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="用户已被禁用")
+
+    update_user_login(user["id"])
+    access_token = create_access_token(user["id"], user["role"])
+    refresh_token = create_refresh_token(user["id"])
+
+    from src.config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+    log_audit(user["id"], "login", "user", user["id"],
+              ip_address=_get_client_ip(request))
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+@router.post("/auth/refresh", response_model=TokenResponse)
+async def refresh_token(req: RefreshRequest):
+    """刷新Token"""
+    payload = decode_token(req.refresh_token)
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="无效的刷新Token")
+
+    user_id = payload["sub"]
+    from src.storage.database import get_user_by_id
+    user = get_user_by_id(user_id)
+    if user is None or not user.get("is_active", True):
+        raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
+
+    access_token = create_access_token(user["id"], user["role"])
+    new_refresh_token = create_refresh_token(user["id"])
+
+    from src.config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=new_refresh_token,
+        expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+# ===================================================================
+# 知识库管理
+# ===================================================================
+
+@router.post("/knowledge_bases", response_model=KnowledgeBaseResponse)
+async def create_kb(
+    req: KnowledgeBaseCreateRequest,
+    user: dict = Depends(require_role("editor")),
+    request: Request = None,
+):
+    """创建知识库"""
+    kb_id = uuid.uuid4().hex
+    kb = create_knowledge_base(kb_id, req.name, req.description, user["id"])
+    log_audit(user["id"], "create_kb", "knowledge_base", kb_id,
+              details=json.dumps({"name": req.name}, ensure_ascii=False),
+              ip_address=_get_client_ip(request))
+    return KnowledgeBaseResponse(**kb)
+
+
+@router.get("/knowledge_bases", response_model=list[KnowledgeBaseResponse])
+async def list_kbs(user: dict = Depends(get_current_user)):
+    """列出知识库（admin看全部，普通用户看自己的）"""
+    if user["role"] == "admin":
+        kbs = list_knowledge_bases()
+    else:
+        kbs = list_knowledge_bases(owner_id=user["id"])
+    return [KnowledgeBaseResponse(**kb) for kb in kbs]
+
+
+@router.get("/knowledge_bases/{kb_id}", response_model=KnowledgeBaseResponse)
+async def get_kb(kb_id: str, user: dict = Depends(get_current_user)):
+    """获取知识库详情"""
+    kb = get_knowledge_base(kb_id)
+    if kb is None:
+        raise HTTPException(status_code=404, detail="知识库不存在")
+    return KnowledgeBaseResponse(**kb)
+
+
+# ===================================================================
+# 核心接口
+# ===================================================================
+
 @router.post("/query", response_model=QueryResponse)
 async def query(
-    request: QueryRequest,
-    key_info: dict = Depends(verify_api_key)
+    req: QueryRequest,
+    user: dict = Depends(get_current_user),
+    request: Request = None,
 ):
     """知识库问答（核心接口）"""
-    # 生成请求ID
     request_id = f"req_{uuid.uuid4().hex[:12]}"
 
-    # 获取或创建会话
-    session_id = request.session_id or f"sess_{uuid.uuid4().hex[:8]}"
+    # 如果指定了 kb_id，切换向量库 collection
+    if req.kb_id:
+        kb = get_knowledge_base(req.kb_id)
+        if kb is None:
+            raise HTTPException(status_code=404, detail="知识库不存在")
+        vector_store.set_kb(req.kb_id)
 
-    # 添加用户消息到会话
-    session_manager.add_message(session_id, "user", request.question)
+    # 多轮会话
+    session_id = req.session_id or f"sess_{uuid.uuid4().hex[:8]}"
+    session_manager.add_message(session_id, "user", req.question)
+    history = session_manager.get_history(session_id)[:-1]
 
-    # 执行RAG问答
-    response = rag_engine.query(request.question, top_k=request.top_k)
-
-    # 添加助手回复到会话
+    response = rag_engine.query(req.question, top_k=req.top_k, history=history,
+                                  user_id=user["id"])
     session_manager.add_message(session_id, "assistant", response.answer)
 
-    # 转换sources格式
     sources = [
         Source(
             file=s["metadata"].get("source", "未知"),
             section=s["metadata"].get("section", ""),
             content_type=s["metadata"].get("content_type", "text"),
             chunk=s["content"],
-            score=s["score"]
+            score=s["score"],
         )
         for s in response.sources
     ]
 
+    # 审计日志
+    log_audit(
+        user["id"], "query", "knowledge_base",
+        req.kb_id or "default",
+        details=json.dumps({"question": req.question}, ensure_ascii=False),
+        ip_address=_get_client_ip(request) if request else "",
+    )
+
     return QueryResponse(
-        request_id=request_id,
+        request_id=response.trace_id or request_id,
         answer=response.answer,
         sources=sources,
         usage=response.usage,
-        timing=response.timing
+        timing=response.timing,
     )
 
+
+# ===================================================================
+# M5: 反馈接口
+# ===================================================================
+
+@router.post("/feedback")
+async def submit_feedback(
+    req: FeedbackRequest,
+    user: dict = Depends(get_current_user),
+    request: Request = None,
+):
+    """用户反馈（赞/踩）"""
+    if req.rating not in (1, -1):
+        raise HTTPException(status_code=400, detail="rating 必须为 1（赞）或 -1（踩）")
+    from src.storage.database import create_feedback
+    feedback_id = create_feedback(
+        request_id=req.request_id,
+        query=req.query or "",
+        rating=req.rating,
+        user_id=user["id"],
+    )
+    log_audit(
+        user["id"], "feedback", "query",
+        req.request_id,
+        details=json.dumps({"rating": req.rating}, ensure_ascii=False),
+        ip_address=_get_client_ip(request) if request else "",
+    )
+    return {"id": feedback_id, "message": "反馈已记录"}
+
+
+# ===================================================================
+# 其他接口
+# ===================================================================
 
 @router.get("/health", response_model=HealthResponse)
 async def health():
@@ -70,55 +258,132 @@ async def health():
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def stats(
-    key_info: dict = Depends(verify_api_key)
-):
+async def stats(user: dict = Depends(get_current_user)):
     """知识库统计"""
     from src.config import DATA_DIR
     total_documents = len(list(DATA_DIR.rglob("*.md")))
     total_chunks = vector_store.count()
-    return StatsResponse(
-        total_documents=total_documents,
-        total_chunks=total_chunks
-    )
+    return StatsResponse(total_documents=total_documents, total_chunks=total_chunks)
 
 
 @router.get("/documents", response_model=DocumentListResponse)
-async def list_documents(
-    key_info: dict = Depends(verify_api_key)
-):
+async def list_documents(user: dict = Depends(get_current_user)):
     """查看文档列表"""
-    # TODO: 实现文档列表
     return DocumentListResponse(documents=[], total=0)
 
 
 @router.post("/documents/upload", response_model=UploadResponse)
-async def upload_document(
-    key_info: dict = Depends(require_role("writer"))
-):
+async def upload_document(user: dict = Depends(require_role("editor"))):
     """上传文档"""
-    # TODO: 实现文档上传
-    return UploadResponse(
-        success=False,
-        message="功能尚未实现"
-    )
+    return UploadResponse(success=False, message="功能尚未实现")
 
 
 @router.delete("/documents/{document_id}")
-async def delete_document(
-    document_id: str,
-    key_info: dict = Depends(require_role("writer"))
-):
+async def delete_document(document_id: str, user: dict = Depends(require_role("editor"))):
     """删除文档"""
-    # TODO: 实现文档删除
     raise HTTPException(status_code=501, detail="功能尚未实现")
 
 
-@router.post("/keys")
-async def create_key(
-    role: str = "reader",
-    key_info: dict = Depends(require_role("admin"))
+@router.post("/index/scan")
+async def index_scan(user: dict = Depends(require_role("admin")), request: Request = None):
+    """扫描文件变化"""
+    from src.core.document_scanner import scan_data_directory
+    scan_result = scan_data_directory()
+    log_audit(user["id"], "index_scan", "system", "",
+              ip_address=_get_client_ip(request) if request else "")
+    return {
+        "added": [str(p) for p in scan_result.added],
+        "modified": [str(p) for p in scan_result.modified],
+        "deleted": scan_result.deleted,
+        "summary": scan_result.summary(),
+    }
+
+
+@router.post("/index/sync")
+async def index_sync(user: dict = Depends(require_role("admin")), request: Request = None):
+    """执行增量同步"""
+    from src.core.incremental_indexer import IncrementalIndexer
+    indexer = IncrementalIndexer()
+    stats = indexer.sync()
+    log_audit(user["id"], "index_sync", "system", "",
+              details=json.dumps(stats, ensure_ascii=False),
+              ip_address=_get_client_ip(request) if request else "")
+    return {
+        "added": stats["added"],
+        "updated": stats["updated"],
+        "deleted": stats["deleted"],
+        "errors": stats["errors"],
+    }
+
+
+@router.get("/index/status")
+async def index_status(user: dict = Depends(get_current_user)):
+    """查看索引状态"""
+    from src.storage.database import get_stats
+    return get_stats()
+
+
+# ===================================================================
+# 审计日志查询（仅 admin）
+# ===================================================================
+
+@router.get("/audit_logs")
+async def get_audit_logs(
+    user: dict = Depends(require_role("admin")),
+    action: str | None = None,
+    limit: int = 100,
 ):
-    """创建API Key（仅管理员）"""
+    """查询审计日志"""
+    from src.storage.database import list_audit_logs
+    return list_audit_logs(action=action, limit=limit)
+
+
+# ===================================================================
+# 旧 API Key 管理（保留兼容）
+# ===================================================================
+
+@router.post("/keys")
+async def create_key(role: str = "reader", user: dict = Depends(require_role("admin"))):
+    """创建API Key（仅管理员，旧接口保留）"""
+    from src.api.auth import create_api_key
     new_key = create_api_key(role)
     return {"key": new_key["key"], "role": new_key["role"]}
+
+
+# ===================================================================
+# M4: 监控接口
+# ===================================================================
+
+@router.get("/metrics")
+async def get_metrics(user: dict = Depends(require_role("admin"))):
+    """返回当前系统指标（计数器 + 直方图）"""
+    return metrics.snapshot()
+
+
+@router.get("/traces/{trace_id}")
+async def get_trace_detail(trace_id: str, user: dict = Depends(get_current_user)):
+    """查看完整调用链路"""
+    trace = get_trace(trace_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail="trace不存在")
+    return trace
+
+
+@router.get("/traces")
+async def list_traces(
+    user: dict = Depends(require_role("admin")),
+    limit: int = 20,
+):
+    """列出最近的trace"""
+    return list_recent_traces(limit=limit)
+
+
+@router.get("/alerts")
+async def get_alerts(
+    user: dict = Depends(require_role("admin")),
+    limit: int = 50,
+):
+    """返回最近的告警记录"""
+    # 先触发一次检查
+    alert_manager.check_all()
+    return metrics.get_recent_alerts(limit=limit)

@@ -1,20 +1,82 @@
 """FastAPI启动入口"""
-from fastapi import FastAPI
+import json
+import asyncio
+import time
+import uuid
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.routes import router
 from src.api.rate_limit import RateLimitMiddleware
-from src.config import API_HOST, API_PORT
+from src.api.auth import API_KEYS
+from src.api.jwt_auth import register_legacy_api_key
+from src.api.logging_config import log_request, request_id_ctx, logger
+from src.core.metrics import metrics
+from src.core.alert_manager import alert_manager
+from src.core.tracer import init_traces_table
+from src.storage.database import init_db
+from src.config import API_HOST, API_PORT, USE_QUERY_EXPANSION, USE_HYDE, USE_RERANKER
+
+# 初始化所有数据表（包括新增的 users / knowledge_bases 等）
+init_db()
+init_traces_table()
+
+
+# ---------------------------------------------------------------------------
+# M4: 请求日志中间件
+# ---------------------------------------------------------------------------
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """为每个HTTP请求记录结构化日志"""
+
+    async def dispatch(self, request: Request, call_next):
+        req_id = f"req_{uuid.uuid4().hex[:12]}"
+        token = request_id_ctx.set(req_id)
+
+        start = time.time()
+        try:
+            response: Response = await call_next(request)
+        except Exception:
+            # 记录错误
+            latency_ms = (time.time() - start) * 1000
+            metrics.inc_counter("total_errors")
+            log_request(request.method, request.url.path, 500, latency_ms)
+            raise
+        finally:
+            request_id_ctx.reset(token)
+
+        latency_ms = (time.time() - start) * 1000
+        log_request(request.method, request.url.path,
+                     response.status_code, latency_ms)
+
+        # 将 request_id 注入响应头，方便前端追踪
+        response.headers["X-Request-ID"] = req_id
+
+        # 定期检查告警
+        alert_manager.check_all()
+
+        return response
+
+# 预置开发用 API Key（旧体系，保持向后兼容）
+API_KEYS["sk-rag-dev-key-12345"] = {
+    "key": "sk-rag-dev-key-12345",
+    "role": "admin",
+    "created_at": "2026-01-01",
+    "active": True,
+}
+# 注册到 JWT 模块的旧 Key 存储，供统一认证回退使用
+register_legacy_api_key("sk-rag-dev-key-12345", API_KEYS["sk-rag-dev-key-12345"])
 
 app = FastAPI(
     title="RAG智能问答API",
     description="基于个人知识库的智能问答服务",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
-# 添加CORS中间件
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,21 +85,99 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 添加限流中间件
+# M4: 请求日志
+app.add_middleware(RequestLoggingMiddleware)
+
+# 限流
 app.add_middleware(RateLimitMiddleware)
 
-# 挂载路由
+# 路由
 app.include_router(router)
+
+# RAG 引擎（WebSocket 使用）
+from src.core.rag_engine import RAGEngine
+rag_engine = RAGEngine(
+    use_query_expansion=USE_QUERY_EXPANSION,
+    use_hyde=USE_HYDE,
+    use_reranker=USE_RERANKER,
+)
 
 
 @app.get("/")
 async def root():
-    """根路径"""
     return {
         "message": "RAG智能问答API",
         "docs": "/docs",
-        "version": "1.0.0"
+        "version": "1.1.0",
     }
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
+    """WebSocket端点 - 前端聊天"""
+    await websocket.accept()
+    print(f"WebSocket连接: session={session_id}")
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = json.loads(data)
+
+            if message.get("type") == "query":
+                query = message.get("query", "")
+                message_id = message.get("message_id", "")
+
+                if not query:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "查询内容不能为空",
+                    })
+                    continue
+
+                loop = asyncio.get_event_loop()
+                try:
+                    response = await loop.run_in_executor(
+                        None,
+                        lambda: rag_engine.query(query, top_k=3),
+                    )
+
+                    await websocket.send_json({
+                        "type": "token",
+                        "message_id": message_id,
+                        "token": response.answer,
+                    })
+
+                    sources = []
+                    for s in response.sources:
+                        sources.append({
+                            "file": s["metadata"].get("source", "未知"),
+                            "section": s["metadata"].get("section", ""),
+                            "chunk": s["content"],
+                            "score": s["score"],
+                        })
+
+                    await websocket.send_json({
+                        "type": "sources",
+                        "message_id": message_id,
+                        "sources": sources,
+                    })
+
+                    await websocket.send_json({
+                        "type": "done",
+                        "message_id": message_id,
+                        "timing": response.timing,
+                    })
+
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"查询失败: {str(e)}",
+                    })
+
+    except WebSocketDisconnect:
+        print(f"WebSocket断开: session={session_id}")
+    except Exception as e:
+        print(f"WebSocket错误: {e}")
 
 
 if __name__ == "__main__":

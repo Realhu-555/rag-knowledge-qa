@@ -24,19 +24,31 @@ class Generator:
                 base_url=DEEPSEEK_BASE_URL
             )
 
-    def generate(self, question: str, sources: list[dict]) -> dict:
-        """生成回答"""
+    def generate(self, question: str, sources: list[dict],
+                  history: list[dict] | None = None) -> dict:
+        """生成回答
+
+        Args:
+            question: 用户当前问题
+            sources: 检索到的参考资料列表
+            history: 对话历史，格式 [{"role": "user/assistant", "content": "..."}]
+        """
         self._init_client()
 
         prompt = self._build_prompt(question, sources)
 
+        # 构建消息列表：系统提示 + 历史对话 + 当前问题
+        messages = [
+            {"role": "system", "content": "你是知识库问答助手。请严格基于参考资料回答。"},
+        ]
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": prompt})
+
         try:
             response = self.client.chat.completions.create(
                 model=DEEPSEEK_MODEL,
-                messages=[
-                    {"role": "system", "content": "你是知识库问答助手。请严格基于参考资料回答。"},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages,
                 temperature=LLM_TEMPERATURE,
                 max_tokens=LLM_MAX_TOKENS
             )
