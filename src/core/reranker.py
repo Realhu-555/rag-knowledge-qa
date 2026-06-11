@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.config import RERANKER_MODEL
 from sentence_transformers import CrossEncoder
 
 
@@ -16,7 +17,7 @@ class RerankResult:
 class Reranker:
     """CrossEncoder重排序器"""
 
-    def __init__(self, model_name: str = "BAAI/bge-reranker-base"):
+    def __init__(self, model_name: str = RERANKER_MODEL):
         self.model_name = model_name
         self.model = None
 

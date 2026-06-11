@@ -14,3 +14,8 @@ python-docx
 pdfplumber
 Pillow
 tiktoken
+chardet
+pytesseract
+PyJWT>=2.8
+bcrypt>=4.0
+cachetools>=5.3

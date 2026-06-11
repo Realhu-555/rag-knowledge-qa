@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.config import RETRIEVAL_TOP_K, RRF_K
+from src.config import RETRIEVAL_TOP_K, RRF_K, HYBRID_VECTOR_WEIGHT, HYBRID_BM25_WEIGHT
 
 
 @dataclass
@@ -123,9 +123,11 @@ class HybridRetriever:
         vector_results: list[RetrievalResult],
         bm25_results: list[RetrievalResult],
         top_k: int,
-        k: int = RRF_K
+        k: int = RRF_K,
+        weight_vector: float = HYBRID_VECTOR_WEIGHT,
+        weight_bm25: float = HYBRID_BM25_WEIGHT,
     ) -> list[RetrievalResult]:
-        """RRF融合"""
+        """加权RRF融合: weight_vector/(k+rank_v) + weight_bm25/(k+rank_bm25)"""
         # 合并所有结果
         all_docs = {}
         for rank, result in enumerate(vector_results):
@@ -150,10 +152,13 @@ class HybridRetriever:
             else:
                 all_docs[doc_key]["bm25_rank"] = rank + 1
 
-        # 计算RRF分数
+        # 计算加权RRF分数
         for doc_key in all_docs:
             info = all_docs[doc_key]
-            rrf_score = 1 / (k + info["vector_rank"]) + 1 / (k + info["bm25_rank"])
+            rrf_score = (
+                weight_vector / (k + info["vector_rank"])
+                + weight_bm25 / (k + info["bm25_rank"])
+            )
             info["result"].score = rrf_score
 
         # 按RRF分数排序
