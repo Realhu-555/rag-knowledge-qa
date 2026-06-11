@@ -1,57 +1,89 @@
-# RAG智能问答系统
+# RAG 智能问答系统
 
-基于个人知识库的智能问答API服务，支持多格式文档、查询理解、回答可追溯。
+企业级知识库问答助手。用户提问后，系统从知识库检索相关文档片段，基于检索结果生成带引用标注的回答。
 
 ## 功能特性
 
-- ✅ Markdown文档加载和智能切片（按标题+字数兜底）
-- ✅ 本地Embedding模型（all-MiniLM-L6-v2）
-- ✅ ChromaDB向量存储（持久化）
-- ✅ 语义检索
-- ✅ DeepSeek API生成（带引用标注[1][2][3]）
-- ✅ Gradio Web界面（调试用）
-- ✅ FastAPI REST API（生产用）
+- **多格式文档处理** — 支持 Markdown / TXT / DOCX / PDF / XLSX / 图片，Loader 插件化
+- **智能切片** — 按标题切分，表格/图片整体保留，短 section 自动合并
+- **混合检索** — 向量检索 + BM25 关键词检索，RRF 融合排序
+- **查询理解** — 查询扩展、HyDE、意图分类
+- **多轮对话** — SessionManager 管理会话历史，支持上下文追问
+- **引用可追溯** — 回答中标注来源（文件名 + 章节名）
+- **生产级能力** — JWT 认证、限流、结构化日志、指标监控、链路追踪、告警
+- **自动评测** — 30 条测试用例，语义相似度评分，定时评测
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| LLM | DeepSeek API（兼容 OpenAI 格式） |
+| Embedding | sentence-transformers all-MiniLM-L6-v2 |
+| 向量数据库 | ChromaDB（本地持久化） |
+| 关键词检索 | rank_bm25 + jieba 中文分词 |
+| 前端 | Vue 3 + Vite + TypeScript + Element Plus |
+| API 服务 | FastAPI + uvicorn + WebSocket |
+| 数据库 | SQLite（API Key、会话、日志） |
 
 ## 快速开始
 
-### 1. 环境准备
+### 环境要求
+
+- Python 3.12+
+- Node.js 18+
+- [uv](https://docs.astral.sh/uv/)（Python 包管理）
+
+### 安装
 
 ```bash
-# 创建虚拟环境
+# 克隆仓库
+git clone https://github.com/HuZhenhu/rag-knowledge-qa.git
+cd rag-knowledge-qa
+
+# 创建虚拟环境并安装依赖
 uv venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 安装依赖
 uv pip install -r requirements.txt
-```
 
-### 2. 配置
-
-复制 `.env.example` 为 `.env`，填入你的 DeepSeek API Key：
-
-```bash
+# 配置 API 密钥
 cp .env.example .env
-# 编辑 .env，填入 DEEPSEEK_API_KEY
+# 编辑 .env 填入 DeepSeek API Key
 ```
 
-### 3. 构建索引
+### 构建索引
 
 ```bash
 python build_index.py
+# 全量重建：python build_index.py --full
 ```
 
-### 4. 启动服务
+### 启动服务
 
-**Gradio界面（调试用）：**
 ```bash
-python app.py
-# 访问 http://localhost:7860
-```
-
-**FastAPI服务：**
-```bash
+# 启动后端 API（http://localhost:8080）
 python main.py
-# 访问 http://localhost:8080/docs 查看API文档
+
+# 启动前端开发服务器（http://localhost:5173）
+cd frontend && npm install && npm run dev
+```
+
+### API 调用
+
+```bash
+# 问答
+curl -X POST http://localhost:8080/api/v1/query \
+  -H "Authorization: Bearer sk-rag-dev-key-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "什么是RAG", "top_k": 5}'
+
+# 上传文档
+curl -X POST http://localhost:8080/api/v1/documents/upload \
+  -H "Authorization: Bearer sk-rag-dev-key-12345" \
+  -F "file=@your_doc.pdf" -F "kb_id=default"
+
+# 健康检查
+curl http://localhost:8080/health \
+  -H "Authorization: Bearer sk-rag-dev-key-12345"
 ```
 
 ## 项目结构
@@ -59,82 +91,39 @@ python main.py
 ```
 rag-knowledge-qa/
 ├── src/
-│   ├── core/           # RAG核心逻辑
-│   │   ├── loaders/    # 文档加载器（插件化）
-│   │   │   ├── base.py            # 统一接口
-│   │   │   └── markdown_loader.py # Markdown加载器
-│   │   ├── splitter.py       # 智能切片
-│   │   ├── embedder.py       # Embedding
-│   │   ├── vector_store.py   # ChromaDB封装
-│   │   ├── retriever.py      # 检索引擎
-│   │   ├── generator.py      # LLM生成
-│   │   └── rag_engine.py     # RAG引擎（串联所有模块）
-│   └── config.py       # 配置管理
-├── data/               # 知识库文件（不修改）
-├── chroma_db/          # ChromaDB持久化（git忽略）
-├── build_index.py      # 构建索引脚本
-├── app.py              # Gradio前端
-├── main.py             # FastAPI入口
-├── .env                # API密钥（不入git）
-└── .env.example        # 配置示例
+│   ├── api/               # FastAPI 接口层（路由、鉴权、限流）
+│   ├── core/              # RAG 核心逻辑
+│   │   ├── loaders/       # 文档加载器（md/txt/docx/pdf/图片）
+│   │   ├── splitter.py    # 智能切片
+│   │   ├── embedder.py    # Embedding
+│   │   ├── vector_store.py # ChromaDB 封装
+│   │   ├── retriever.py   # 混合检索（向量+BM25）
+│   │   ├── generator.py   # LLM 生成（带引用）
+│   │   ├── rag_engine.py  # RAG 引擎（串联所有模块）
+│   │   └── session.py     # 多轮对话管理
+│   ├── storage/           # SQLite 持久化
+│   └── config.py          # 配置管理
+├── data/                  # 知识库文件
+├── frontend/              # Vue 3 前端
+├── tests/                 # 测试用例
+├── main.py                # FastAPI 启动入口
+├── build_index.py         # 构建向量索引
+└── evaluate.py            # 评测脚本
 ```
-
-## 技术栈
-
-- **语言**: Python 3.12+
-- **包管理**: uv
-- **Embedding**: sentence-transformers all-MiniLM-L6-v2（本地模型）
-- **向量数据库**: ChromaDB（本地持久化）
-- **LLM**: DeepSeek API（兼容OpenAI格式）
-- **Web界面**: Gradio（调试用）
-- **API服务**: FastAPI（生产用）
 
 ## 配置说明
 
+关键配置在 `src/config.py`，可通过环境变量覆盖：
+
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| DEEPSEEK_API_KEY | - | DeepSeek API密钥（必填）|
-| EMBEDDING_PROVIDER | local | Embedding提供者（local/api）|
-| EMBEDDING_MODEL | all-MiniLM-L6-v2 | Embedding模型名 |
-| CHUNK_SIZE | 500 | 切片大小（字符）|
-| CHUNK_OVERLAP | 50 | 切片重叠（字符）|
+| CHUNK_SIZE | 800 | 切片大小 |
+| CHUNK_OVERLAP | 100 | 切片重叠 |
 | RETRIEVAL_TOP_K | 10 | 检索返回数量 |
-
-## 使用示例
-
-### Python代码调用
-
-```python
-from src.core.rag_engine import RAGEngine
-
-engine = RAGEngine()
-response = engine.query("什么是RAG？")
-
-print(response.answer)
-print(response.sources)
-print(response.timing)
-```
-
-### API调用
-
-```bash
-curl -X POST "http://localhost:8080/api/v1/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "什么是RAG？"}'
-```
-
-## 开发说明
-
-### 添加新的文档格式
-
-1. 在 `src/core/loaders/` 下创建新的loader文件
-2. 继承 `BaseLoader` 基类
-3. 实现 `load()` 和 `supported_extensions()` 方法
-4. 在 `__init__.py` 中导出
-
-### 切换Embedding模型
-
-修改 `.env` 中的 `EMBEDDING_PROVIDER` 和 `EMBEDDING_MODEL`，然后重新运行 `build_index.py`。
+| USE_HYBRID_RETRIEVAL | true | 启用混合检索 |
+| RELEVANCE_THRESHOLD | 0.01 | 相关性阈值 |
+| LLM_TEMPERATURE | 0.7 | LLM 温度 |
+| MAX_HISTORY_ROUNDS | 5 | 多轮对话保留轮数 |
 
 ## License
 
