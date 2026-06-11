@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.config import CHUNK_SIZE, CHUNK_OVERLAP
+from src.config import CHUNK_SIZE, CHUNK_OVERLAP, TABLE_NL_DESCRIPTION
 from src.core.loaders.base import DocumentElement, ElementType
 
 
@@ -45,8 +45,16 @@ class SmartSplitter:
         chunks = []
 
         for element in elements:
-            element_chunks = self.split_element(element)
-            chunks.extend(element_chunks)
+            # 表格元素：如果启用了表格NL描述，先生成描述再切分
+            if element.element_type == ElementType.TABLE and TABLE_NL_DESCRIPTION:
+                from src.core.preprocessor import enrich_table_element
+                enriched = enrich_table_element(element)
+                for enriched_elem in enriched:
+                    element_chunks = self.split_element(enriched_elem)
+                    chunks.extend(element_chunks)
+            else:
+                element_chunks = self.split_element(element)
+                chunks.extend(element_chunks)
 
         return chunks
 

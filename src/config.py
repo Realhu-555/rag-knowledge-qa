@@ -70,6 +70,35 @@ JWT_REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "
 # 注册开关（admin可关闭开放注册）
 ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").lower() == "true"
 
+# M6: 大规模数据支撑配置
+VECTOR_STORE_BACKEND = os.getenv("VECTOR_STORE_BACKEND", "chroma")  # chroma / milvus / faiss
+BATCH_EMBEDDING_SIZE = int(os.getenv("BATCH_EMBEDDING_SIZE", "100"))  # 批量Embedding大小
+PARALLEL_LOAD_WORKERS = int(os.getenv("PARALLEL_LOAD_WORKERS", "4"))  # 并行加载线程数
+DEDUP_SIMILARITY_THRESHOLD = float(os.getenv("DEDUP_SIMILARITY_THRESHOLD", "0.95"))  # 相似度去重阈值
+
+# M7: 多模态能力配置（默认关闭）
+MULTIMODAL_ENABLED = os.getenv("MULTIMODAL_ENABLED", "false").lower() == "true"
+IMAGE_LLM_DESCRIPTION = os.getenv("IMAGE_LLM_DESCRIPTION", "false").lower() == "true"  # 用LLM生成图片描述
+TABLE_NL_DESCRIPTION = os.getenv("TABLE_NL_DESCRIPTION", "false").lower() == "true"  # 表格生成自然语言描述
+CHART_ANALYSIS_ENABLED = os.getenv("CHART_ANALYSIS_ENABLED", "false").lower() == "true"  # 图表分析
+MULTIMODAL_EMBEDDING = os.getenv("MULTIMODAL_EMBEDDING", "false").lower() == "true"  # CLIP多模态Embedding
+OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "chi_sim+eng")  # OCR支持语言
+
+# M8: 对话能力增强配置
+USE_CONVERSATION_SUMMARY = os.getenv("USE_CONVERSATION_SUMMARY", "false").lower() == "true"
+SUMMARY_THRESHOLD_ROUNDS = int(os.getenv("SUMMARY_THRESHOLD_ROUNDS", "5"))  # 超过多少轮触发摘要
+SUMMARY_KEEP_RECENT_ROUNDS = int(os.getenv("SUMMARY_KEEP_RECENT_ROUNDS", "3"))  # 保留最近几轮完整对话
+FOLLOWUP_SCORE_THRESHOLD = float(os.getenv("FOLLOWUP_SCORE_THRESHOLD", "0.3"))  # 追问分数阈值
+USE_INTENT_CLASSIFICATION = os.getenv("USE_INTENT_CLASSIFICATION", "false").lower() == "true"
+
+# M9: 评测配置
+EVAL_TEST_CASES_PATH = os.getenv("EVAL_TEST_CASES_PATH", "evaluation/test_cases.json")
+EVAL_RESULTS_DIR = os.getenv("EVAL_RESULTS_DIR", "evaluation")
+EVAL_SIMILARITY_THRESHOLD = float(os.getenv("EVAL_SIMILARITY_THRESHOLD", "0.6"))
+EVAL_ALERT_DROP_THRESHOLD = float(os.getenv("EVAL_ALERT_DROP_THRESHOLD", "0.05"))  # 准确率下降5%告警
+EVAL_SCHEDULE_HOUR = int(os.getenv("EVAL_SCHEDULE_HOUR", "2"))  # 每天凌晨2点
+EVAL_SCHEDULE_MINUTE = int(os.getenv("EVAL_SCHEDULE_MINUTE", "0"))
+
 # M4: 监控告警配置
 ALERT_ERROR_RATE_THRESHOLD = float(os.getenv("ALERT_ERROR_RATE_THRESHOLD", "0.05"))  # 5%
 ALERT_LATENCY_THRESHOLD_MS = int(os.getenv("ALERT_LATENCY_THRESHOLD_MS", "3000"))  # 3000ms

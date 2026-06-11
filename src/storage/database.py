@@ -113,6 +113,22 @@ def init_db() -> None:
             )
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS evaluations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                version TEXT NOT NULL,
+                total_cases INTEGER NOT NULL,
+                success_cases INTEGER NOT NULL,
+                retrieval_hit_rate REAL NOT NULL,
+                answer_accuracy REAL NOT NULL,
+                citation_accuracy REAL NOT NULL,
+                avg_semantic_similarity REAL NOT NULL,
+                avg_latency_ms REAL NOT NULL,
+                details TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+        """)
+
         conn.commit()
     finally:
         conn.close()
@@ -570,5 +586,69 @@ def get_feedback_stats() -> dict:
             "SELECT COUNT(*) FROM feedback WHERE rating = -1"
         ).fetchone()[0]
         return {"total": total, "positive": positive, "negative": negative}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Evaluations
+# ---------------------------------------------------------------------------
+
+def save_evaluation(version: str, total_cases: int, success_cases: int,
+                    retrieval_hit_rate: float, answer_accuracy: float,
+                    citation_accuracy: float, avg_semantic_similarity: float,
+                    avg_latency_ms: float, details: str = "{}") -> int:
+    """保存评测结果，返回记录 ID"""
+    conn = _get_conn()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO evaluations "
+            "(version, total_cases, success_cases, retrieval_hit_rate, "
+            "answer_accuracy, citation_accuracy, avg_semantic_similarity, "
+            "avg_latency_ms, details, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (version, total_cases, success_cases, retrieval_hit_rate,
+             answer_accuracy, citation_accuracy, avg_semantic_similarity,
+             avg_latency_ms, details,
+             datetime.now().isoformat(timespec="seconds")),
+        )
+        conn.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+    finally:
+        conn.close()
+
+
+def list_evaluations(limit: int = 20) -> list[dict]:
+    """列出最近的评测记录"""
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM evaluations ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_latest_evaluation() -> dict | None:
+    """获取最近一次评测结果"""
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM evaluations ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_previous_evaluation() -> dict | None:
+    """获取上一次（倒数第二次）评测结果，用于对比"""
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM evaluations ORDER BY id DESC LIMIT 1 OFFSET 1"
+        ).fetchone()
+        return dict(row) if row else None
     finally:
         conn.close()

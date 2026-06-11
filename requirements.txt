@@ -19,3 +19,4 @@ pytesseract
 PyJWT>=2.8
 bcrypt>=4.0
 cachetools>=5.3
+APScheduler>=3.10
