@@ -1,8 +1,6 @@
 """API Key鉴权"""
-import hashlib
 import secrets
 from datetime import datetime
-from typing import Optional
 
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

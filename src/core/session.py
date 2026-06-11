@@ -1,7 +1,6 @@
 """会话管理"""
 import time
 from dataclasses import dataclass, field
-from typing import Any
 
 from src.config import MAX_HISTORY_ROUNDS, SESSION_TIMEOUT_MINUTES
 
