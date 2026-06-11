@@ -4,4 +4,4 @@ __pycache__/
 chroma_db/
 .env
 *.db
-data/
+# data/目录保留，但个人文档不提交
