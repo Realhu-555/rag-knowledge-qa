@@ -117,6 +117,19 @@ class MarkdownSplitter:
         # 按标题切分
         sections = self._split_by_headers(content)
 
+        # 合并过短的section（如孤立标题），避免无效chunk
+        # 先过滤空section
+        sections = [s for s in sections if s["content"].strip()]
+        # 向后合并：短section合并到下一个
+        i = 0
+        while i < len(sections):
+            content = sections[i]["content"].strip()
+            if len(content) < 100 and i + 1 < len(sections):
+                sections[i + 1]["content"] = content + "\n\n" + sections[i + 1]["content"]
+                sections.pop(i)
+            else:
+                i += 1
+
         chunks = []
         for section in sections:
             section_content = section["content"].strip()

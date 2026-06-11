@@ -17,6 +17,7 @@ from src.core.alert_manager import alert_manager
 from src.core.tracer import init_traces_table
 from src.storage.database import init_db
 from src.config import API_HOST, API_PORT, USE_QUERY_EXPANSION, USE_HYDE, USE_RERANKER
+from src.core.session import SessionManager
 
 # 初始化所有数据表（包括新增的 users / knowledge_bases 等）
 init_db()
@@ -101,6 +102,7 @@ rag_engine = RAGEngine(
     use_hyde=USE_HYDE,
     use_reranker=USE_RERANKER,
 )
+session_manager = SessionManager()
 
 
 @app.get("/")
@@ -134,12 +136,28 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
                     })
                     continue
 
+                # 记录用户消息到会话
+                session_manager.add_message(session_id, "user", query)
+
+                # 获取对话历史和摘要
+                history = session_manager.get_history(session_id)[:-1]
+                summary = session_manager.get_summary(session_id)
+
                 loop = asyncio.get_event_loop()
                 try:
                     response = await loop.run_in_executor(
                         None,
-                        lambda: rag_engine.query(query, top_k=3),
+                        lambda: rag_engine.query(
+                            query,
+                            top_k=3,
+                            history=history,
+                            summary=summary,
+                            user_id=session_id,
+                        ),
                     )
+
+                    # 记录AI回复到会话
+                    session_manager.add_message(session_id, "assistant", response.answer)
 
                     await websocket.send_json({
                         "type": "token",
@@ -149,9 +167,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
 
                     sources = []
                     for s in response.sources:
+                        meta = s.get("metadata", {})
+                        file_name = meta.get("source_file", "") or meta.get("source", "未知")
+                        if "\\" in file_name or "/" in file_name:
+                            file_name = file_name.replace("\\", "/").split("/")[-1]
                         sources.append({
-                            "file": s["metadata"].get("source", "未知"),
-                            "section": s["metadata"].get("section", ""),
+                            "file": file_name,
+                            "section": meta.get("section", ""),
                             "chunk": s["content"],
                             "score": s["score"],
                         })

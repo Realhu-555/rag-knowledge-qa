@@ -12,12 +12,21 @@ const ws = useWebSocket(WS_URL.value)
 
 ws.connect(sessionId.value)
 
+const pendingSources = ref<Record<string, any[]>>({})
+const pendingTiming = ref<Record<string, any>>({})
+
 ws.onToken = (messageId: string, token: string) => {
   handleToken(messageId, token)
 }
 
+ws.onSources = (messageId: string, sources: any[]) => {
+  pendingSources.value[messageId] = sources
+}
+
 ws.onDone = (messageId: string, timing: any) => {
-  setMessageDone(messageId, undefined, timing)
+  const sources = pendingSources.value[messageId]
+  setMessageDone(messageId, sources, timing)
+  delete pendingSources.value[messageId]
 }
 
 ws.onError = (msg: string) => {

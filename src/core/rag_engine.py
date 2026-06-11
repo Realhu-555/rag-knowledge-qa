@@ -277,13 +277,14 @@ class RAGEngine:
                 "final_count": len(final_results),
             })
 
-            # 3.5 M5: 阈值过滤
+            # 3.5 M5: 不再用阈值硬过滤，保留所有结果让LLM判断是否相关
             pre_filter_count = len(final_results)
-            final_results = [r for r in final_results if r.score >= RELEVANCE_THRESHOLD]
+            final_results = [r for r in final_results if r.score > -10]
 
-            # 4. 准备sources
+            # 4. 准备sources — 只取分数最高的5条给LLM，避免太多结果稀释注意力
+            final_results_for_llm = sorted(final_results, key=lambda r: r.score, reverse=True)[:5]
             sources = []
-            for result in final_results:
+            for result in final_results_for_llm:
                 sources.append({
                     "content": result.content,
                     "metadata": result.metadata,
@@ -291,9 +292,9 @@ class RAGEngine:
                 })
 
             # ---- M8: 主动追问检测 ----
-            # 所有chunk分数都低于阈值（或过滤后无结果），且过滤前有结果说明检索到了但不相关
+            # 检索本身没返回任何结果时触发追问
             is_followup = False
-            if not sources and pre_filter_count > 0:
+            if pre_filter_count == 0:
                 # 检索到了结果但全部低于阈值 → 可能需要追问
                 max_score = max(r.score for r in final_results) if final_results else 0
                 if max_score < FOLLOWUP_SCORE_THRESHOLD and has_history:

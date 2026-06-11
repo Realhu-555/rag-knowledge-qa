@@ -40,7 +40,12 @@ class Generator:
         prompt = self._build_prompt(question, sources)
 
         # 构建系统提示
-        system_content = "你是知识库问答助手。请严格基于参考资料回答。"
+        system_content = (
+            "你是知识库问答助手。请基于参考资料和对话历史回答。\n"
+            "引用格式：在关键论断末尾标注（文件名，章节名）。\n"
+            "如果用户追问（如详细一点、展开说说），结合对话上下文理解意图，"
+            "优先从参考资料查找，找不到则基于之前的回答展开。"
+        )
         if summary:
             system_content += f"\n\n之前对话的摘要：\n{summary}"
 
@@ -78,18 +83,33 @@ class Generator:
     def _build_prompt(self, question: str, sources: list[dict]) -> str:
         """构建prompt模板"""
         prompt = """规则：
-1. 每个关键论断后面用[编号]标注引用来源
-2. 只使用参考资料中的信息，不要编造
-3. 如果参考资料不足以回答，说"知识库中未找到相关信息"
-4. 多个来源支持同一论断时，全部标注：[1][3]
+1. 优先使用参考资料中的信息回答问题
+2. 如果参考资料中有相关信息，基于参考资料回答
+3. 如果参考资料中没有，但对话历史中有相关内容（比如之前的回答中出现过），可以基于对话历史回答，并说明"基于之前的对话内容"
+4. 只有参考资料和对话历史都无法回答时，才说"知识库中未找到相关信息"
+5. 多个来源支持同一论断时，全部标注
+
+引用格式：
+在每个关键论断的末尾标注来源，格式为：（文件名，第X页）或（文件名，XX章节）
+示例：FastAPI是当前最流行的Python Web框架之一（AI技术栈介绍.md，第3页）
+如果无法确定具体页码，用章节名代替：FastAPI专为API开发设计（AI技术栈介绍.md，Web框架章节）
 
 参考资料：
 """
         for i, source in enumerate(sources, 1):
-            file_name = source.get("metadata", {}).get("source", "未知")
-            section = source.get("metadata", {}).get("section", "")
+            meta = source.get("metadata", {})
+            file_name = meta.get("source_file", "") or meta.get("source", "未知")
+            if "\\" in file_name or "/" in file_name:
+                file_name = file_name.replace("\\", "/").split("/")[-1]
+            section = meta.get("section", "")
+            page = meta.get("page_number", "")
             content = source.get("content", "")
-            prompt += f"[{i}] 来源：{file_name} - {section}\n    内容：{content}\n\n"
+            source_tag = file_name
+            if page:
+                source_tag += f"，第{page}页"
+            elif section:
+                source_tag += f"，{section}"
+            prompt += f"[{source_tag}] {content}\n\n"
 
         prompt += f"用户问题：{question}"
 
