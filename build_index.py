@@ -117,12 +117,26 @@ def build_index_full():
     documents: list[str] = []
     metadatas: list[dict] = []
 
+    def _sanitize_metadata(meta: dict) -> dict:
+        """清理metadata，确保所有值是ChromaDB支持的类型"""
+        clean = {}
+        for k, v in meta.items():
+            if isinstance(v, (str, int, float, bool)):
+                clean[k] = v
+            elif isinstance(v, list):
+                clean[k] = str(v)
+            elif v is None:
+                clean[k] = ""
+            else:
+                clean[k] = str(v)
+        return clean
+
     for i, chunk in enumerate(all_chunks):
         source = chunk.metadata.get("source_file", "")
         chunk_id = hashlib.md5(f"{source}_{i}".encode()).hexdigest()
         ids.append(chunk_id)
         documents.append(chunk.content)
-        metadatas.append(chunk.metadata)
+        metadatas.append(_sanitize_metadata(chunk.metadata))
 
     # 清空旧数据
     try:
