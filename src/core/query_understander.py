@@ -1,5 +1,6 @@
 """查询理解"""
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 
@@ -11,6 +12,8 @@ from src.config import (
     DEEPSEEK_MODEL,
     LLM_TEMPERATURE,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -82,8 +85,8 @@ class QueryUnderstander:
                 except json.JSONDecodeError:
                     pass
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("查询扩展失败: %s，返回原始查询", e)
 
         return QueryExpansion(
             original_query=query,
@@ -117,5 +120,6 @@ class QueryUnderstander:
             )
             return response.choices[0].message.content
 
-        except Exception:
+        except Exception as e:
+            logger.warning("HyDE生成失败: %s，返回原始查询", e)
             return query

@@ -25,6 +25,7 @@ class HealthResponse(BaseModel):
     """健康检查响应"""
     status: str = Field("ok", description="服务状态")
     version: str = Field("1.0.0", description="版本号")
+    vector_store: dict = Field(default_factory=dict, description="向量库健康状态")
 
 
 class StatsResponse(BaseModel):

@@ -130,9 +130,10 @@ class ImageLoader(BaseLoader):
         try:
             import pytesseract
             from PIL import Image
+            from src.config import TESSERACT_CMD
 
+            pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
             img = Image.open(file_path)
-            # 使用config的语言设置
             text = pytesseract.image_to_string(img, lang=OCR_LANGUAGES)
             return text
         except Exception as e:

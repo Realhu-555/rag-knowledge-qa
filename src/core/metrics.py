@@ -158,6 +158,35 @@ class MetricsCollector:
             return False
 
     # ------------------------------------------------------------------
+    # Prometheus 导出
+    # ------------------------------------------------------------------
+
+    def to_prometheus(self) -> str:
+        """将当前指标导出为 Prometheus exposition format 文本。
+
+        支持 counter（只增不减的计数器）和 gauge（直方图摘要值）两类指标。
+        """
+        lines: list[str] = []
+
+        with self._lock:
+            # --- counters ---
+            for name, value in sorted(self._counters.items()):
+                lines.append(f"rag_{name} {value}")
+            # --- histogram summaries as gauges ---
+            for name, bucket in sorted(self._histograms.items()):
+                if not bucket.values:
+                    continue
+                base = f"rag_{name}"
+                lines.append(f"{base}_count {bucket.count}")
+                lines.append(f"{base}_avg {bucket.avg:.2f}")
+                lines.append(f"{base}_p50 {bucket.p50:.2f}")
+                lines.append(f"{base}_p95 {bucket.p95:.2f}")
+                lines.append(f"{base}_p99 {bucket.p99:.2f}")
+                lines.append(f"{base}_max {bucket.max:.2f}")
+
+        return "\n".join(lines) + "\n"
+
+    # ------------------------------------------------------------------
     # 全量快照
     # ------------------------------------------------------------------
 

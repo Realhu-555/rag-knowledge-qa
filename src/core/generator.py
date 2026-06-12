@@ -1,5 +1,7 @@
 """LLM生成 — 支持OpenAI兼容API和Anthropic Claude"""
+import logging
 
+from src.core.errors import GenerationError
 from src.config import (
     LLM_PROVIDER,
     OPENAI_API_KEY,
@@ -10,6 +12,8 @@ from src.config import (
     LLM_TEMPERATURE,
     LLM_MAX_TOKENS,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Generator:
@@ -68,11 +72,11 @@ class Generator:
                 return self._call_openai(system_content, messages)
 
         except Exception as e:
-            return {
-                "answer": "抱歉，AI服务暂时不可用，请稍后重试。",
-                "usage": {},
-                "error": str(e)
-            }
+            logger.error("LLM调用失败: %s", e)
+            raise GenerationError(
+                message=f"LLM调用失败: {e}",
+                details={"provider": LLM_PROVIDER, "model": OPENAI_MODEL if LLM_PROVIDER != "anthropic" else ANTHROPIC_MODEL},
+            ) from e
 
     def _call_openai(self, system_content: str, messages: list[dict]) -> dict:
         """调用OpenAI兼容API"""

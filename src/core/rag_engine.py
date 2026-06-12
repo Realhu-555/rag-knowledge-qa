@@ -1,4 +1,5 @@
 """RAG引擎 — 串联所有模块 + M4链路追踪/指标 + M8对话增强"""
+import logging
 import time
 from dataclasses import dataclass, field
 
@@ -17,6 +18,8 @@ from src.config import (
     USE_INTENT_CLASSIFICATION,
     FOLLOWUP_SCORE_THRESHOLD,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -111,11 +114,11 @@ class RAGEngine:
             if all_data and all_data.get("documents"):
                 documents = all_data["documents"]
                 self.retriever.build_bm25_index(documents)
-                print(f"BM25索引构建完成，共 {len(documents)} 个文档")
+                logger.info("BM25索引构建完成，共 %d 个文档", len(documents))
             else:
-                print("向量库为空，跳过BM25索引构建")
+                logger.info("向量库为空，跳过BM25索引构建")
         except Exception as e:
-            print(f"BM25索引构建失败: {e}，回退到纯向量检索")
+            logger.warning("BM25索引构建失败: %s，回退到纯向量检索", e)
             self.retriever = Retriever(self.vector_store, self.embedder)
 
     def query(self, question: str, top_k: int = RETRIEVAL_TOP_K,

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
+from fastapi.responses import PlainTextResponse
 
 from src.api.schemas import (
     QueryRequest, QueryResponse, Source,
@@ -286,8 +287,14 @@ async def export_session(
 
 @router.get("/health", response_model=HealthResponse)
 async def health():
-    """健康检查"""
-    return HealthResponse(status="ok", version="1.0.0")
+    """健康检查（含向量库状态）"""
+    vs_health = vector_store.health_check()
+    overall_status = "ok" if vs_health["status"] == "ok" else "degraded"
+    return HealthResponse(
+        status=overall_status,
+        version="1.0.0",
+        vector_store=vs_health,
+    )
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -503,6 +510,12 @@ async def create_key(role: str = "reader", user: dict = Depends(require_role("ad
 async def get_metrics(user: dict = Depends(require_role("admin"))):
     """返回当前系统指标（计数器 + 直方图）"""
     return metrics.snapshot()
+
+
+@router.get("/metrics/prometheus")
+async def get_prometheus_metrics(user: dict = Depends(require_role("admin"))):
+    """返回 Prometheus exposition format 的指标文本"""
+    return PlainTextResponse(content=metrics.to_prometheus())
 
 
 @router.get("/traces/{trace_id}")

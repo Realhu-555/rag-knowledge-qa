@@ -249,6 +249,24 @@ class VectorStore:
     def count(self) -> int:
         return self._backend.count(collection_name=self._active_collection())
 
+    def health_check(self) -> dict:
+        """返回向量库健康状态。
+
+        Returns:
+            {"status": "ok"|"error", "collection": ..., "count": ...}
+        """
+        try:
+            collection = self._active_collection()
+            count = self._backend.count(collection_name=collection)
+            return {"status": "ok", "collection": collection, "count": count}
+        except Exception as exc:
+            return {
+                "status": "error",
+                "collection": self._active_collection(),
+                "count": 0,
+                "error": str(exc),
+            }
+
     def get_all(self) -> dict:
         return self._backend.get_all(collection_name=self._active_collection())
 
