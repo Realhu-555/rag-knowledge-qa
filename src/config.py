@@ -72,6 +72,7 @@ ALLOWED_FILE_TYPES = os.getenv("ALLOWED_FILE_TYPES", ".md,.txt,.docx,.pdf,.xlsx,
 # 限流配置
 RATE_LIMIT_DAILY = int(os.getenv("RATE_LIMIT_DAILY", "100"))
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "10"))
+RATE_LIMIT_DB = os.getenv("RATE_LIMIT_DB", str(BASE_DIR / "rate_limit.db"))
 
 # JWT认证配置
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "rag-knowledge-qa-dev-secret-key-change-in-production")
@@ -95,6 +96,7 @@ TABLE_NL_DESCRIPTION = os.getenv("TABLE_NL_DESCRIPTION", "false").lower() == "tr
 CHART_ANALYSIS_ENABLED = os.getenv("CHART_ANALYSIS_ENABLED", "false").lower() == "true"  # 图表分析
 MULTIMODAL_EMBEDDING = os.getenv("MULTIMODAL_EMBEDDING", "false").lower() == "true"  # CLIP多模态Embedding
 OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "chi_sim+eng")  # OCR支持语言
+TESSERACT_CMD = os.getenv("TESSERACT_CMD", "tesseract")  # Tesseract可执行文件路径
 
 # M8: 对话能力增强配置
 USE_CONVERSATION_SUMMARY = os.getenv("USE_CONVERSATION_SUMMARY", "false").lower() == "true"

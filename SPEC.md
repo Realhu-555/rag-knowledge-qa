@@ -36,9 +36,9 @@
 | | | | FAISS | 不支持metadata过滤 |
 | 关键词检索 | rank_bm25 | 经典BM25算法，轻量 | Elasticsearch | 太重，需要额外服务 |
 | ReRanker | sentence-transformers CrossEncoder (bge-reranker) | 精排效果好，本地运行 | Cohere Rerank | 云服务，要花钱 |
-| LLM生成 | DeepSeek API | 便宜、中文效果好、已有key | MiniMax | 中文效果不如DeepSeek |
+| LLM生成 | DeepSeek/OpenAI/Anthropic Claude（多提供商） | 灵活切换，按需选择 | MiniMax | 中文效果不如DeepSeek |
 | 多模态LLM | DeepSeek-VL | 图片理解，用于图片描述生成 | GPT-4V | 贵 |
-| Web前端 | Vue 3 + Element Plus | 组件化、交互丰富 | Gradio | Gradio定制性不够 |
+| Web前端 | Vue 3 + Element Plus | 组件化、交互丰富、可定制 | Gradio | 定制性不够 |
 | API服务 | FastAPI | 自带Swagger文档，异步支持好 | Flask | FastAPI性能更好，自带数据校验 |
 | 数据库 | SQLite | 轻量，单文件，够用 | PostgreSQL | 项目规模不需要 |
 | 对象存储 | 本地文件系统 | 简单直接 | MinIO/阿里云OSS | 后续需要再升级 |
@@ -64,7 +64,7 @@
     ↓
 [4] ReRanker精排：对合并结果重新打分排序
     ↓
-[5] LLM生成：把Top-K片段塞进prompt，要求标注引用[1][2][3]
+[5] LLM生成：把Top-K片段塞进prompt，要求标注引用(文件名，章节名)
     ↓
 [6] 返回结果：回答 + 引用来源 + 检索详情
 ```
@@ -250,22 +250,20 @@ extraction_quality: 提取质量分数（OCR置信度，0-1）
 1. 每个关键论断后面用(文件名，章节名)标注引用来源
 2. 只使用参考资料中的信息，不要编造
 3. 如果参考资料不足以回答，说"知识库中未找到相关信息"
-4. 多个来源支持同一论断时，全部标注：[1][3]
+4. 多个来源支持同一论断时，全部标注：(03-RAG检索增强生成.md，什么是RAG)
 
 **prompt模板：**
 ```
 你是知识库问答助手。请严格基于以下参考资料回答。
 
 规则：
-1. 每个关键论断后面用[编号]标注引用来源
+1. 每个关键论断后面用(文件名，章节名)标注引用来源
 2. 只使用参考资料中的信息，不要编造
 3. 如果参考资料不足以回答，说"知识库中未找到相关信息"
 
 参考资料：
-[1] 来源：03-RAG检索增强生成.md - 什么是RAG
-    内容：{chunk_content}
-[2] 来源：04-LangChain基础.md - 检索链路
-    内容：{chunk_content}
+(03-RAG检索增强生成.md，什么是RAG)：{chunk_content}
+(04-LangChain基础.md，检索链路)：{chunk_content}
 
 用户问题：{question}
 ```
@@ -402,7 +400,7 @@ Body:
 ```
 {
     "request_id": "req_abc123",
-    "answer": "RAG是检索增强生成 [1]，核心流程分三步...",
+    "answer": "RAG是检索增强生成 (03-RAG检索增强生成.md，什么是RAG)，核心流程分三步...",
     "sources": [
         {
             "file": "03-RAG检索增强生成.md",
@@ -467,11 +465,11 @@ Body:
 │  [发送]                                      │
 ├─────────────────────────────────────────────┤
 │  🤖 回答                                     │
-│  RAG是检索增强生成技术 [1]，核心流程分三步...  │
+│  RAG是检索增强生成技术 (03-RAG检索增强生成.md，什么是RAG)，核心流程分三步...  │
 │                                              │
 │  📚 参考来源（点击展开原文）                  │
-│  ▶ [1] 03-RAG检索增强生成.md                 │
-│       第1节「什么是RAG」相关度 92%            │
+│  ▶ (03-RAG检索增强生成.md，什么是RAG)        │
+│       相关度 92%                             │
 │       ┌─────────────────────────────────┐   │
 │       │ RAG的全称是Retrieval-Augmented   │   │
 │       │ Generation，中文叫检索增强生成... │   │
@@ -542,7 +540,7 @@ Body:
 **需求描述：** 有一套标准测试集，能量化系统的回答质量。
 
 **评测集（evaluation/test_qa.json）：**
-- 10个问题 + 标准答案
+- 30条测试用例 + 标准答案
 - 覆盖：简单事实查询、多文档综合查询、边界情况（知识库没有的信息）
 - 示例：
   - 简单事实："什么是RAG？"
@@ -608,7 +606,7 @@ rag-knowledge-qa/
 │   │   ├── database.py            # SQLite（API Key、追溯日志、反馈）
 │   │   └── models.py              # 数据表定义
 │   └── config.py                  # 配置管理（从.env读取）
-├── app.py                         # Gradio前端
+├── app.py                         # Gradio前端（调试用）
 ├── main.py                        # FastAPI启动入口
 ├── build_index.py                 # 一键构建向量索引
 ├── manage_keys.py                 # API Key管理工具
@@ -697,7 +695,7 @@ rag-knowledge-qa/
 
 量化效果。
 
-25. **评测集** — 10个问题+标准答案（简单事实、多文档综合、边界情况）
+25. **评测集** — 30条测试用例+标准答案（简单事实、多文档综合、边界情况）
 26. **评测脚本** — 自动跑评测集，计算检索命中率和回答准确率
 
 **验证标准：** 跑完评测集输出准确率数字。
@@ -734,7 +732,11 @@ uvicorn
 python-multipart
 
 # 前端
-gradio
+vue
+element-plus
+axios
+pinia
+vite
 
 # 文档处理（企业级扩展用）
 python-docx
@@ -755,7 +757,7 @@ tiktoken  # token计数
 - [ ] build_index.py 成功构建索引，打印chunk数
 - [ ] 命令行问答正常，回答带(文件名，章节名)引用标注
 - [ ] 问"RAG是什么"返回RAG相关文档
-- [ ] 引用[1]确实来自03-RAG检索增强生成.md
+- [ ] 引用(03-RAG检索增强生成.md，什么是RAG)确实来自对应文档
 
 **Phase 2 验证：**
 - [ ] 查询扩展能拆出多个子查询
@@ -788,7 +790,7 @@ tiktoken  # token计数
 - [ ] traces接口可查看某次问答的完整链路
 
 **Phase 6 验证：**
-- [ ] 评测集10个问题全部跑完
+- [ ] 评测集30条测试用例全部跑完
 - [ ] 输出准确率数字
 - [ ] 知识库没有的问题回答"未找到相关信息"
 
@@ -805,7 +807,6 @@ tiktoken  # token计数
 | pdf表格识别不准 | 表格数据丢失 | 先用pdfplumber，效果不好换camelot或Unstructured |
 | LLM不按格式标注引用 | 可追溯失效 | prompt里加few-shot示例，或后处理正则提取 |
 | 知识库文档太少 | 检索覆盖面不足 | 后续持续往data/目录加文档 |
-| Gradio界面太简陋 | 不好演示 | 先跑通再美化，或换Streamlit |
 
 ---
 
