@@ -37,7 +37,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/HuZhenhu/rag-knowledge-qa.git
+git clone https://github.com/Realhu-555/rag-knowledge-qa.git
 cd rag-knowledge-qa
 
 # 创建虚拟环境并安装依赖
