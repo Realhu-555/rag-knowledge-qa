@@ -17,7 +17,6 @@ _mock_st = MagicMock()
 _mock_st.SentenceTransformer = MagicMock()
 sys.modules.setdefault("sentence_transformers", _mock_st)
 
-import chromadb  # noqa: E402 — 确保chromadb可用
 
 
 # ─── 辅助工具 ───
@@ -409,7 +408,7 @@ class TestIncrementalIndexer:
 
     def test_sync_add_new_file(self, tmp_db, tmp_data_dir):
         """新增文件应被索引"""
-        from src.core.document_scanner import ScanResult, compute_file_hash
+        from src.core.document_scanner import ScanResult
         from src.storage.database import get_document
         from src.core.splitter import Chunk
 
@@ -598,7 +597,7 @@ class TestBuildIndex:
 
     def test_build_index_incremental_no_changes(self, tmp_db, tmp_data_dir, capsys):
         """增量模式无变化时应提示已是最新"""
-        from src.core.document_scanner import scan_data_directory, ScanResult
+        from src.core.document_scanner import ScanResult
         from src.storage.database import init_db
         init_db()
 

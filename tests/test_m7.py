@@ -11,9 +11,8 @@
 8. 多模态Embedding开关（MULTIMODAL_EMBEDDING配置）
 """
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from unittest.mock import Mock, patch
 
-import pytest
 
 
 # ======================================================================
@@ -448,7 +447,6 @@ class TestImageLoader:
     def test_load_with_llm_description(self, mock_gen_desc):
         """LLM描述启用时生成描述"""
         from src.core.loaders.image_loader import ImageLoader
-        from src.core.loaders.base import ElementType
 
         mock_gen_desc.return_value = "这是一张流程图，展示了系统架构。"
 

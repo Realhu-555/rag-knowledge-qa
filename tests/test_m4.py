@@ -8,9 +8,7 @@
 """
 import json
 import logging
-import sqlite3
 import time
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -23,7 +21,7 @@ class TestJSONLogger:
 
     def test_json_format_output(self):
         """日志输出应为合法JSON，且包含必要字段"""
-        from src.api.logging_config import JSONFormatter, request_id_ctx
+        from src.api.logging_config import JSONFormatter
 
         formatter = JSONFormatter()
         record = logging.LogRecord(
@@ -234,7 +232,7 @@ class TestTracer:
         from src.core.tracer import Trace
 
         trace = Trace(query="测试")
-        span = trace.start_span("retrieval")
+        trace.start_span("retrieval")
         time.sleep(0.01)
         trace.end_span(data={"results": 5})
 

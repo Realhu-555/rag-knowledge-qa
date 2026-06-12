@@ -1,5 +1,4 @@
 """查询理解模块测试"""
-import pytest
 from unittest.mock import Mock, patch
 from src.core.query_understander import QueryUnderstander, QueryExpansion
 

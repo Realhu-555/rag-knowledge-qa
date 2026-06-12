@@ -2,7 +2,6 @@
 import json
 import logging
 import sys
-import time
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from typing import Any

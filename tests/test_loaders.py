@@ -1,5 +1,4 @@
 """Loader和SmartSplitter模块测试"""
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,7 @@ from src.core.loaders.base import DocumentElement, ElementType
 from src.core.loaders.markdown_loader import MarkdownLoader
 from src.core.loaders.docx_loader import DocxLoader
 from src.core.loaders.txt_loader import TxtLoader
-from src.core.splitter import SmartSplitter, Chunk
+from src.core.splitter import SmartSplitter
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +251,7 @@ class TestSmartSplitter:
     def test_text_markdown_style_split(self):
         """文本类型（Markdown风格）按标题切分"""
         splitter = SmartSplitter(chunk_size=500, chunk_overlap=50)
-        content = "# 第一章\n这是第一章的内容。\n\n## 第二节\n这是第二节的内容。\n\n## 第三节\n这是第三节的内容。"
+        content = "# 第一章\n这是第一章的内容，需要写一段足够长的文字来确保每个section的长度超过100个字符，这样就不会被合并逻辑处理了。我们继续添加更多文字直到满足长度要求，现在文字已经足够多了，每个section都会独立存在。\n\n## 第二节\n这是第二节的内容，同样需要足够长的文字来避免被合并。通过增加文字长度，我们可以确保每个section独立存在，测试按标题切分的功能是否正常工作，这段内容已经超过了100个字符的限制，不会被合并。\n\n## 第三节\n这是第三节的内容，也需要有足够的长度来确保三个section都能独立存在并被正确切分处理。这段文字需要超过100个字符才能避免被合并处理，每个section都独立存在。"
         element = DocumentElement(
             content=content,
             element_type=ElementType.TEXT,

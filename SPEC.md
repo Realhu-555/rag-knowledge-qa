@@ -38,7 +38,7 @@
 | ReRanker | sentence-transformers CrossEncoder (bge-reranker) | 精排效果好，本地运行 | Cohere Rerank | 云服务，要花钱 |
 | LLM生成 | DeepSeek API | 便宜、中文效果好、已有key | MiniMax | 中文效果不如DeepSeek |
 | 多模态LLM | DeepSeek-VL | 图片理解，用于图片描述生成 | GPT-4V | 贵 |
-| Web前端 | Gradio | 3行代码出界面，AI应用标配 | Streamlit | Gradio对AI场景更友好 |
+| Web前端 | Vue 3 + Element Plus | 组件化、交互丰富 | Gradio | Gradio定制性不够 |
 | API服务 | FastAPI | 自带Swagger文档，异步支持好 | Flask | FastAPI性能更好，自带数据校验 |
 | 数据库 | SQLite | 轻量，单文件，够用 | PostgreSQL | 项目规模不需要 |
 | 对象存储 | 本地文件系统 | 简单直接 | MinIO/阿里云OSS | 后续需要再升级 |
@@ -85,8 +85,8 @@
 | .png/.jpg（图片） | PIL加载 | 不切片 | OCR或多模态大模型生成描述文本 |
 
 **切片参数：**
-- chunk_size：500字符（约250个中文字符）
-- chunk_overlap：50字符（前后块重叠，防止语义断裂）
+- chunk_size：800字符（约400个中文字符）
+- chunk_overlap：100字符（前后块重叠，防止语义断裂）
 
 **切片策略说明：**
 - Markdown优先按标题切——每个chunk有明确主题
@@ -247,7 +247,7 @@ extraction_quality: 提取质量分数（OCR置信度，0-1）
 在给LLM的prompt中强制要求：
 
 **规则：**
-1. 每个关键论断后面用[编号]标注引用来源，如[1][2]
+1. 每个关键论断后面用(文件名，章节名)标注引用来源
 2. 只使用参考资料中的信息，不要编造
 3. 如果参考资料不足以回答，说"知识库中未找到相关信息"
 4. 多个来源支持同一论断时，全部标注：[1][3]
@@ -272,7 +272,7 @@ extraction_quality: 提取质量分数（OCR置信度，0-1）
 
 #### 2.7.2 展示端：引用可点击
 
-前端把回答中的[1][2][3]渲染为可点击链接，点击后展开对应的原文卡片：
+前端把回答中的引用标注渲染为可点击链接，点击后展开对应的原文卡片：
 
 ```
 卡片内容：
@@ -455,7 +455,7 @@ Body:
 
 ### 2.12 前端界面
 
-**需求描述：** 提供Gradio Web界面，方便演示和日常使用。
+**需求描述：** 提供Vue 3 + Element Plus Web界面，组件化开发，交互丰富。
 
 **界面布局：**
 ```
@@ -639,7 +639,7 @@ rag-knowledge-qa/
 5. **ChromaDB向量存储** — 封装add/query/delete/count四个操作，持久化到chroma_db/
 6. **构建索引脚本** — build_index.py一键：加载知识库→切片→Embedding→存入ChromaDB，打印统计信息
 7. **语义检索** — 输入query返回top-k结果（带分数和metadata）
-8. **LLM生成** — DeepSeek API，prompt强制标注引用[1][2][3]，不允许编造
+8. **LLM生成** — DeepSeek/OpenAI/Anthropic Claude多提供商，prompt强制标注(文件名，章节名)引用，不允许编造
 9. **RAG引擎串联** — rag_engine.py组合以上模块，完整流程跑通
 
 **验证标准：** 命令行能问能答，回答带引用标注，引用指向正确的来源文件。
@@ -753,7 +753,7 @@ tiktoken  # token计数
 
 **Phase 1 验证：**
 - [ ] build_index.py 成功构建索引，打印chunk数
-- [ ] 命令行问答正常，回答带[1][2][3]引用标注
+- [ ] 命令行问答正常，回答带(文件名，章节名)引用标注
 - [ ] 问"RAG是什么"返回RAG相关文档
 - [ ] 引用[1]确实来自03-RAG检索增强生成.md
 
@@ -774,7 +774,7 @@ tiktoken  # token计数
 - [ ] 多轮对话能理解上下文
 
 **Phase 4 验证：**
-- [ ] Gradio界面可访问
+- [ ] Vue前端界面可访问
 - [ ] 问答功能正常
 - [ ] 引用来源可点击展开
 - [ ] 耗时和token统计显示正确

@@ -1,7 +1,6 @@
 """RAG引擎 — 串联所有模块 + M4链路追踪/指标 + M8对话增强"""
 import time
 from dataclasses import dataclass, field
-from typing import Any
 
 from src.core.embedder import Embedder
 from src.core.vector_store import VectorStore
@@ -15,7 +14,6 @@ from src.api.logging_config import log_retrieval, log_llm_call
 from src.config import RETRIEVAL_TOP_K, USE_HYBRID_RETRIEVAL, RELEVANCE_THRESHOLD
 from src.core.query_cache import QueryCache
 from src.config import (
-    USE_CONVERSATION_SUMMARY,
     USE_INTENT_CLASSIFICATION,
     FOLLOWUP_SCORE_THRESHOLD,
 )
@@ -190,7 +188,7 @@ class RAGEngine:
 
         try:
             # 1. 查询理解
-            span = trace.start_span("query_understanding")
+            trace.start_span("query_understanding")
             query_start = time.time()
             expanded_queries = [question]
             entities = []
@@ -228,7 +226,7 @@ class RAGEngine:
             })
 
             # 2. 多路检索
-            span = trace.start_span("retrieval")
+            trace.start_span("retrieval")
             retrieval_start = time.time()
             all_results = []
 
@@ -258,7 +256,7 @@ class RAGEngine:
             })
 
             # 3. ReRanker重排序
-            span = trace.start_span("rerank")
+            trace.start_span("rerank")
             rerank_start = time.time()
             if self.use_reranker and unique_results:
                 # 准备reranker输入
@@ -293,7 +291,6 @@ class RAGEngine:
 
             # ---- M8: 主动追问检测 ----
             # 检索本身没返回任何结果时触发追问
-            is_followup = False
             if pre_filter_count == 0:
                 # 检索到了结果但全部低于阈值 → 可能需要追问
                 max_score = max(r.score for r in final_results) if final_results else 0
@@ -310,7 +307,7 @@ class RAGEngine:
                     )
 
             # 5. 生成
-            span = trace.start_span("generation")
+            trace.start_span("generation")
             generation_start = time.time()
             if not sources:
                 answer = "知识库中未找到相关信息"
@@ -359,7 +356,7 @@ class RAGEngine:
                 intent=intent,
             )
 
-        except Exception as e:
+        except Exception:
             trace.status = "error"
             metrics.inc_counter("total_errors")
             raise

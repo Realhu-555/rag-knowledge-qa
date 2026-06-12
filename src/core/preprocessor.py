@@ -79,7 +79,7 @@ def parse_markdown_table(content: str) -> list[list[str]] | None:
     Returns:
         二维列表，或None（不是表格）
     """
-    lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
+    lines = [line.strip() for line in content.strip().split("\n") if line.strip()]
     if len(lines) < 2:
         return None
 

@@ -10,7 +10,7 @@ class TxtLoader(BaseLoader):
     def __init__(self):
         """初始化加载器"""
         try:
-            import chardet
+            import chardet  # noqa: F401
             self._chardet_available = True
         except ImportError:
             self._chardet_available = False

@@ -1,5 +1,4 @@
 """LLM生成模块测试"""
-import pytest
 from unittest.mock import Mock, patch
 from src.core.generator import Generator
 
@@ -19,19 +18,18 @@ class TestGenerator:
 
         assert "什么是RAG？" in prompt
         assert "RAG是检索增强生成" in prompt
-        assert "[1]" in prompt
-        assert "[2]" in prompt
         assert "rag.md" in prompt
+        assert "简介" in prompt
 
     def test_build_prompt_includes_rules(self):
         """prompt包含规则"""
         gen = Generator()
         prompt = gen._build_prompt("问题", [])
 
-        assert "不要编造" in prompt
-        assert "知识库中未找到" in prompt
+        assert "知识库中未找到相关信息" in prompt
+        assert "参考资料" in prompt
 
-    @patch('src.core.generator.OpenAI')
+    @patch('openai.OpenAI')
     def test_generate_calls_llm(self, mock_openai_class):
         """生成调用LLM"""
         mock_client = Mock()

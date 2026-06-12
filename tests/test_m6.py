@@ -114,7 +114,6 @@ class TestBatchEmbedding:
     def _get_embedder_class(self):
         """获取Embedder类（在mock环境下）"""
         # 重新导入以获取mock后的类
-        import importlib
         if "src.core.embedder" in __import__("sys").modules:
             del __import__("sys").modules["src.core.embedder"]
         from src.core.embedder import Embedder

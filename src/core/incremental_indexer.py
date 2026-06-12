@@ -16,7 +16,6 @@ from src.storage.database import (
     init_db,
     get_document_by_path,
     delete_document,
-    list_documents,
 )
 
 
@@ -128,7 +127,7 @@ class IncrementalIndexer:
 
         # 重新索引
         self._add_file(file_path)
-        print(f"    更新完成")
+        print("    更新完成")
 
     def _delete_file(self, file_path_str: str) -> None:
         """删除文件的向量数据和registry记录"""

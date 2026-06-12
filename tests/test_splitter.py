@@ -1,5 +1,4 @@
 """切片模块测试"""
-import pytest
 from src.core.splitter import MarkdownSplitter, RecursiveCharacterSplitter, Chunk
 
 
@@ -10,13 +9,13 @@ class TestMarkdownSplitter:
         """按标题切分"""
         splitter = MarkdownSplitter(chunk_size=1000)
         content = """# 标题一
-这是标题一的内容
+这是标题一的内容，这是一段比较长的文字，用来确保每个section的长度超过100个字符，这样就不会被合并逻辑处理了。我们继续添加更多内容直到满足要求为止，现在文字已经足够多了，每个section都会独立存在。
 
 ## 标题二
-这是标题二的内容
+这是标题二的内容，同样需要足够长的文字来避免被合并。通过增加文字长度，我们可以确保每个section独立存在，测试按标题切分的功能是否正常工作，这段内容已经超过了100个字符的限制，不会被合并。
 
 ### 标题三
-这是标题三的内容"""
+这是标题三的内容，也需要有足够的长度，来确保三个section都能独立存在并被正确切分。这段文字需要超过100个字符才能避免被合并处理，每个section都独立存在。"""
 
         chunks = splitter.split(content, {"source": "test.md"})
 

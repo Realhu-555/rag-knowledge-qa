@@ -1,5 +1,4 @@
 """Pydantic模型测试"""
-import pytest
 from src.api.schemas import (
     QueryRequest,
     QueryResponse,

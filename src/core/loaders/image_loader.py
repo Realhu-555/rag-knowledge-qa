@@ -9,7 +9,6 @@ from src.config import (
 from src.core.loaders.base import BaseLoader, DocumentElement, ElementType
 from src.core.preprocessor import (
     generate_image_description,
-    generate_chart_description,
 )
 
 
@@ -26,7 +25,7 @@ class ImageLoader(BaseLoader):
         """初始化加载器"""
         self._tesseract_available = False
         try:
-            import pytesseract
+            import pytesseract  # noqa: F401
             self._tesseract_available = True
         except ImportError:
             pass

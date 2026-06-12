@@ -8,10 +8,8 @@
 """
 import time
 import threading
-import tempfile
-import os
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 
 
 # ======================================================================
@@ -127,7 +125,6 @@ class TestWeightedRRF:
 
     def test_rrf_empty_sources(self):
         """两个来源都为空时返回空列表"""
-        from src.core.retriever import RetrievalResult
 
         retriever = self._make_retriever()
         fused = retriever._rrf_fusion([], [], top_k=10)
@@ -286,8 +283,8 @@ class TestRelevanceThreshold:
 
         filtered = [r for r in results if r.score >= threshold]
 
-        # 默认阈值0.3: 保留 0.9, 0.5, 0.3；排除 0.1, 0.01
-        assert len(filtered) == 3
+        # 默认阈值0.01: 保留 0.9, 0.5, 0.3, 0.1, 0.01；排除无
+        assert len(filtered) == 5
         assert all(r.score >= threshold for r in filtered)
 
     def test_threshold_boundary_equal(self):
@@ -326,9 +323,9 @@ class TestRelevanceThreshold:
         assert len(filtered) == 3
 
     def test_threshold_config_default(self):
-        """config中默认阈值为0.3"""
+        """config中默认阈值为0.01"""
         from src.config import RELEVANCE_THRESHOLD
-        assert RELEVANCE_THRESHOLD == 0.3
+        assert RELEVANCE_THRESHOLD == 0.01
 
     def test_threshold_custom_via_env(self, monkeypatch):
         """通过环境变量可自定义阈值"""
@@ -480,10 +477,10 @@ class TestRAGEngineCacheIntegration:
         from src.config import RELEVANCE_THRESHOLD
 
         cache = QueryCache(maxsize=100, ttl=3600)
-        # 缓存中有低分结果
+        # 缓存中有低于阈值的结果
         cached_sources = [
-            {"content": "low score doc", "score": 0.05},
-            {"content": "another low", "score": 0.1},
+            {"content": "low score doc", "score": 0.005},
+            {"content": "another low", "score": 0.001},
         ]
         cache.set("test query", 5, cached_sources)
 
@@ -501,7 +498,7 @@ class TestRAGEngineCacheIntegration:
         cache = QueryCache(maxsize=100, ttl=3600)
         cached_sources = [
             {"content": "good doc", "score": 0.9},
-            {"content": "low doc", "score": 0.1},
+            {"content": "low doc", "score": 0.005},
         ]
         cache.set("test query 2", 5, cached_sources)
 

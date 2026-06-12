@@ -1,6 +1,5 @@
 """向量存储模块测试"""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from src.core.vector_store import VectorStore, ChromaBackend, reset_backend
 
 

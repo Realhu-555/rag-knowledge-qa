@@ -8,7 +8,6 @@ from src.config import (
     SESSION_TIMEOUT_MINUTES,
     USE_CONVERSATION_SUMMARY,
     SUMMARY_THRESHOLD_ROUNDS,
-    SUMMARY_KEEP_RECENT_ROUNDS,
 )
 
 
@@ -130,14 +129,14 @@ class SessionManager:
 
         created = datetime.datetime.fromtimestamp(session.created_at)
         lines = [
-            f"# 对话记录",
-            f"",
+            "# 对话记录",
+            "",
             f"- **会话ID**: `{session.session_id}`",
             f"- **创建时间**: {created.strftime('%Y-%m-%d %H:%M:%S')}",
             f"- **消息数量**: {len(session.messages)}",
-            f"",
-            f"---",
-            f"",
+            "",
+            "---",
+            "",
         ]
 
         if session.summary:

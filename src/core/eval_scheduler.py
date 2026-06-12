@@ -19,10 +19,6 @@ def run_scheduled_evaluation() -> dict:
         评测汇总结果字典
     """
     from evaluate import run_evaluation, save_to_database
-    from src.storage.database import (
-        get_latest_evaluation,
-        get_previous_evaluation,
-    )
 
     logger.info("定时评测开始执行")
 

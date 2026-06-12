@@ -1,5 +1,4 @@
 """ReRanker模块测试"""
-import pytest
 from unittest.mock import Mock, patch
 from src.core.reranker import Reranker, RerankResult
 

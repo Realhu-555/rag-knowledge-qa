@@ -1,7 +1,6 @@
 """M3模块验收测试 — 多用户权限（JWT认证 + 角色权限 + 审计日志 + 向后兼容）"""
 import sqlite3
 import sys
-import time
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta, timezone
 
@@ -85,7 +84,7 @@ class TestRegisterAndLogin:
     def test_login_returns_valid_tokens(self, tmp_db_with_user):
         """登录应返回可用的access_token和refresh_token"""
         from src.api.jwt_auth import (
-            hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+            verify_password, create_access_token, create_refresh_token, decode_token
         )
         from src.storage.database import get_user_by_username
 
@@ -387,7 +386,7 @@ class TestAuditLog:
 
         # 按 action 过滤
         login_logs = list_audit_logs(action="login")
-        assert all(l["action"] == "login" for l in login_logs)
+        assert all(entry["action"] == "login" for entry in login_logs)
         assert len(login_logs) == 2
 
         # 按 user_id 过滤
@@ -446,7 +445,6 @@ class TestAuditLog:
     def test_log_audit_exception_silenced(self, tmp_db):
         """log_audit写入失败时不应抛出异常（静默处理）"""
         from src.api.jwt_auth import log_audit
-        from unittest.mock import patch
 
         with patch("src.api.jwt_auth.create_audit_log", side_effect=Exception("DB error")):
             # 不应抛异常
@@ -718,7 +716,6 @@ class TestIntegrationFlow:
         from src.api.jwt_auth import (
             get_current_user, require_role,
             create_access_token, create_refresh_token,
-            register_legacy_api_key, log_audit,
             hash_password, verify_password,
         )
         from src.storage.database import create_user, get_user_by_username, update_user_login

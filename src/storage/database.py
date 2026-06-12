@@ -1,7 +1,6 @@
 """SQLite数据库管理 — 文档注册表 + 用户体系 + 多知识库 + 审计日志"""
 import sqlite3
 from datetime import datetime
-from pathlib import Path
 
 from src.config import BASE_DIR
 from src.storage.models import DocumentRecord

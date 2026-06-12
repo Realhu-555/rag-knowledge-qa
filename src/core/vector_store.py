@@ -9,9 +9,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from src.config import VECTOR_STORE_BACKEND
+
+logger = logging.getLogger(__name__)
 
 # 默认 collection 名称（未指定 kb_id 时使用）
 DEFAULT_COLLECTION = "knowledge_base"

@@ -30,7 +30,6 @@ from src.core.session import SessionManager
 from src.core.metrics import metrics
 from src.core.tracer import get_trace, list_recent_traces
 from src.core.alert_manager import alert_manager
-from src.api.logging_config import log_request, request_id_ctx, logger
 from src.config import USE_QUERY_EXPANSION, USE_HYDE, USE_RERANKER, ALLOW_REGISTRATION, USE_CONVERSATION_SUMMARY
 
 router = APIRouter(prefix="/api/v1")

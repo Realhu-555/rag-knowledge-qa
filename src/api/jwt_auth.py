@@ -15,9 +15,6 @@ from src.config import (
 )
 from src.storage.database import (
     get_user_by_id,
-    get_user_by_username,
-    update_user_login,
-    create_user,
     create_audit_log,
 )
 

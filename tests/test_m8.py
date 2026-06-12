@@ -13,7 +13,6 @@
 import sys
 from unittest.mock import Mock, patch, MagicMock
 
-import pytest
 
 # Mock掉sentence_transformers和torch，避免torch循环导入问题
 # 这些模块在测试M8功能时不需要真实执行
@@ -176,7 +175,7 @@ class TestSplitMessages:
 class TestSummaryInjection:
     """测试 Generator.generate 中摘要注入到 system message"""
 
-    @patch("src.core.generator.OpenAI")
+    @patch("openai.OpenAI")
     def test_summary_injected_into_system(self, mock_openai_cls):
         """有summary时，system message包含摘要"""
         from src.core.generator import Generator
@@ -199,7 +198,7 @@ class TestSummaryInjection:
         assert system_msg["role"] == "system"
         assert "这是之前的对话摘要" in system_msg["content"]
 
-    @patch("src.core.generator.OpenAI")
+    @patch("openai.OpenAI")
     def test_no_summary_normal_system(self, mock_openai_cls):
         """无summary时，system message不含摘要相关文字"""
         from src.core.generator import Generator
@@ -222,7 +221,7 @@ class TestSummaryInjection:
         assert system_msg["role"] == "system"
         assert "摘要" not in system_msg["content"]
 
-    @patch("src.core.generator.OpenAI")
+    @patch("openai.OpenAI")
     def test_history_injected_between_system_and_user(self, mock_openai_cls):
         """history消息插入在system和user之间"""
         from src.core.generator import Generator
@@ -274,7 +273,7 @@ class TestSessionManagerSummary:
 
     def test_get_history_with_summary_has_summary(self):
         """有摘要时get_history_with_summary在开头插入system摘要"""
-        from src.core.session import SessionManager, Session
+        from src.core.session import SessionManager
 
         mgr = SessionManager()
         session = mgr.get_or_create_session("s2")
@@ -358,19 +357,22 @@ class TestFollowupGeneration:
         engine.query_cache = Mock()
         engine.query_cache.get.return_value = None
         engine._intent_classifier = None
+        engine.generator = Mock()
 
         # Mock意图分类器
         mock_classifier = Mock()
         mock_classifier.classify.return_value = Mock(intent=Mock(value="query"))
         engine._intent_classifier = mock_classifier
 
-        # Mock检索器返回低分结果
-        mock_result = Mock()
-        mock_result.content = "不太相关的内容"
-        mock_result.metadata = {}
-        mock_result.score = 0.1  # 低于FOLLOWUP_SCORE_THRESHOLD(0.3)
+        # Mock检索器返回空结果（触发pre_filter_count == 0路径）
         engine.retriever = Mock()
-        engine.retriever.retrieve.return_value = [mock_result]
+        engine.retriever.retrieve.return_value = []
+
+        # Mock generator.generate 返回值（chitchat路径可能用到）
+        engine.generator.generate.return_value = {
+            "answer": "知识库中未找到相关信息",
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+        }
 
         # Mock _generate_followup
         with patch.object(engine, "_generate_followup", return_value="请提供更多信息"):
@@ -480,7 +482,7 @@ class TestIntentClassifier:
 
     def test_chitchat_keyword_ignored_with_history(self):
         """有历史时，闲聊关键词不触发闲聊分类（走LLM）"""
-        from src.core.intent_classifier import IntentClassifier, Intent
+        from src.core.intent_classifier import IntentClassifier
 
         with patch("src.core.intent_classifier.OpenAI") as mock_openai_cls:
             mock_client = Mock()
@@ -490,7 +492,7 @@ class TestIntentClassifier:
             mock_client.chat.completions.create.return_value = mock_resp
 
             classifier = IntentClassifier()
-            result = classifier.classify("你好", has_history=True)
+            classifier.classify("你好", has_history=True)
 
         # 有历史时应该调LLM而非关键词匹配
         mock_client.chat.completions.create.assert_called_once()

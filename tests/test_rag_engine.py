@@ -1,5 +1,4 @@
 """RAG引擎测试"""
-import pytest
 from unittest.mock import Mock, patch
 from src.core.rag_engine import RAGEngine
 

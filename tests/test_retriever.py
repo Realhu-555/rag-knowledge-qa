@@ -4,7 +4,7 @@ from unittest.mock import Mock
 from src.core.retriever import Retriever, RetrievalResult
 
 jieba = pytest.importorskip("jieba")
-from src.core.retriever import HybridRetriever
+from src.core.retriever import HybridRetriever  # noqa: E402
 
 
 class TestRetriever:
