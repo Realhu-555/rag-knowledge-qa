@@ -63,3 +63,39 @@ export interface WSErrorMessage {
 }
 
 export type WSMessage = WSTokenMessage | WSSourcesMessage | WSDoneMessage | WSErrorMessage
+
+// 数据监控事件
+export interface DataMonitorEvent {
+  type: 'file_change' | 'index_start' | 'index_progress' | 'index_complete' | 'index_error' | 'pong'
+  timestamp: number
+}
+
+export interface FileChangeEvent extends DataMonitorEvent {
+  type: 'file_change'
+  action: string
+  files: string[]
+}
+
+export interface IndexStartEvent extends DataMonitorEvent {
+  type: 'index_start'
+  files: string[]
+  count: number
+}
+
+export interface IndexProgressEvent extends DataMonitorEvent {
+  type: 'index_progress'
+  current: number
+  total: number
+  filename: string
+}
+
+export interface IndexCompleteEvent extends DataMonitorEvent {
+  type: 'index_complete'
+  stats: { added: number; updated: number; deleted: number; errors: number }
+}
+
+export interface IndexErrorEvent extends DataMonitorEvent {
+  type: 'index_error'
+  filename: string
+  error: string
+}

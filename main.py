@@ -202,6 +202,25 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
         print(f"WebSocket错误: {e}")
 
 
+@app.websocket("/ws/data-monitor")
+async def data_monitor_endpoint(websocket: WebSocket):
+    """WebSocket端点 - 数据变化监控（文件新增/修改/索引进度）"""
+    from src.core.data_monitor import get_data_monitor
+    monitor = get_data_monitor()
+    await monitor.connect(websocket)
+    try:
+        while True:
+            # 保持连接，等待客户端消息（心跳或控制指令）
+            data = await websocket.receive_text()
+            msg = json.loads(data)
+            if msg.get("type") == "ping":
+                await websocket.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        await monitor.disconnect(websocket)
+    except Exception:
+        await monitor.disconnect(websocket)
+
+
 # M9: 启动评测定时任务
 try:
     from src.core.eval_scheduler import start_scheduler

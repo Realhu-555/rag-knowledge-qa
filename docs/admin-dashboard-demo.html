@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --radius: 1rem;
+  --radius-sm: 0.5rem;
+  --radius-full: 9999px;
+  --font: 'Plus Jakarta Sans', -apple-system, sans-serif;
+}
+
+[data-theme="dark"] {
+  --bg: #050505;
+  --bg-surface: #0A0A0A;
+  --bg-card: rgba(255,255,255,0.03);
+  --bg-hover: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.08);
+  --text-1: #fff;
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.3);
+  --accent: #8B5CF6;
+  --accent-soft: rgba(139,92,246,0.08);
+  --success: #10B981;
+  --success-bg: rgba(16,185,129,0.15);
+  --error: #EF4444;
+  --error-bg: rgba(239,68,68,0.15);
+  --warning: #F59E0B;
+  --warning-bg: rgba(245,158,11,0.15);
+}
+
+[data-theme="light"] {
+  --bg: #F8F9FC;
+  --bg-surface: #FFFFFF;
+  --bg-card: rgba(0,0,0,0.02);
+  --bg-hover: rgba(0,0,0,0.04);
+  --border: rgba(0,0,0,0.08);
+  --text-1: #0F172A;
+  --text-2: #64748B;
+  --text-3: #94A3B8;
+  --accent: #7C3AED;
+  --accent-soft: rgba(124,58,237,0.06);
+  --success: #059669;
+  --success-bg: rgba(5,150,105,0.1);
+  --error: #DC2626;
+  --error-bg: rgba(220,38,38,0.1);
+  --warning: #D97706;
+  --warning-bg: rgba(217,119,6,0.1);
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-1);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 240px; padding: 20px 12px; display: flex; flex-direction: column; gap: 2px;
+  border-right: 1px solid var(--border); background: var(--bg-surface);
+  transition: background 0.3s, border-color 0.3s;
+}
+.logo { display: flex; align-items: center; gap: 10px; padding: 8px; margin-bottom: 20px; }
+.logo-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #6D28D9);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: white;
+}
+.logo-text { font-size: 14px; font-weight: 700; }
+.nav-section {
+  font-size: 10px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.1em; padding: 14px 8px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: var(--radius-sm); color: var(--text-2); cursor: pointer;
+  transition: all 0.2s; font-size: 13px; font-weight: 500;
+}
+.nav-item:hover { color: var(--text-1); background: var(--bg-hover); }
+.nav-item.active { color: var(--text-1); background: var(--accent-soft); }
+.nav-icon { width: 16px; height: 16px; opacity: 0.6; }
+.nav-item.active .nav-icon, .nav-item:hover .nav-icon { opacity: 1; }
+.sidebar-footer { margin-top: auto; padding: 12px 8px; border-top: 1px solid var(--border); }
+.user-info { display: flex; align-items: center; gap: 8px; }
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #6D28D9, #4F46E5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: white;
+}
+.user-name { font-size: 12px; font-weight: 600; }
+.user-role { font-size: 10px; color: var(--text-3); }
+
+/* MAIN */
+.main { flex: 1; padding: 28px 32px; overflow-y: auto; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.header-title { font-size: 24px; font-weight: 800; }
+.header-subtitle { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+.theme-btn {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--text-2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; font-size: 15px;
+}
+.theme-btn:hover { color: var(--text-1); background: var(--bg-hover); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  border-radius: var(--radius-full); font-family: var(--font);
+  font-size: 12px; font-weight: 600; border: none; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-ghost { background: var(--bg-card); color: var(--text-2); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text-1); background: var(--bg-hover); }
+
+/* STATS */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat {
+  padding: 20px; border-radius: var(--radius); background: var(--bg-surface);
+  border: 1px solid var(--border); transition: all 0.3s; position: relative;
+}
+.stat:hover { transform: translateY(-1px); }
+.stat-label { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+.stat-value { font-size: 28px; font-weight: 800; }
+.stat-change {
+  display: inline-flex; font-size: 10px; font-weight: 600;
+  padding: 2px 6px; border-radius: var(--radius-full); margin-top: 4px;
+}
+.stat-change.up { color: var(--success); background: var(--success-bg); }
+.stat-change.down { color: var(--error); background: var(--error-bg); }
+
+/* TABLE */
+.content { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.card {
+  padding: 20px; border-radius: var(--radius); background: var(--bg-surface);
+  border: 1px solid var(--border); transition: all 0.3s;
+}
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.card-title { font-size: 14px; font-weight: 700; }
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  text-align: left; font-size: 10px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; padding: 0 12px 8px; border-bottom: 1px solid var(--border);
+}
+.table td { padding: 10px 12px; font-size: 12px; border-bottom: 1px solid var(--border); }
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: var(--bg-hover); }
+.badge {
+  display: inline-flex; font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--radius-full);
+}
+.badge-success { color: var(--success); background: var(--success-bg); }
+.badge-warning { color: var(--warning); background: var(--warning-bg); }
+.badge-ghost { color: var(--text-2); background: var(--bg-hover); }
+
+.alert { display: flex; align-items: flex-start; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.alert:last-child { border-bottom: none; }
+.dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.dot.green { background: var(--success); }
+.dot.yellow { background: var(--warning); }
+.dot.red { background: var(--error); }
+.alert-text { font-size: 12px; color: var(--text-2); }
+.alert-time { font-size: 10px; color: var(--text-3); margin-top: 1px; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">R</div>
+      <div class="logo-text">RAG Admin</div>
+    </div>
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      Documents
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+      Index Monitor
+    </div>
+    <div class="nav-section">Analytics</div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Query Logs
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Evaluations
+    </div>
+    <div class="nav-section">System</div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      Users
+    </div>
+    <div class="nav-item">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+      Chat
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">H</div>
+        <div><div class="user-name">admin</div><div class="user-role">Administrator</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="header">
+      <div>
+        <div class="header-title">Dashboard</div>
+        <div class="header-subtitle">System overview and real-time metrics</div>
+      </div>
+      <div class="header-actions">
+        <button class="theme-btn" onclick="toggleTheme()" title="Switch theme">
+          <span id="theme-icon">&#9790;</span>
+        </button>
+        <button class="btn btn-ghost">Run Eval</button>
+        <button class="btn btn-primary">Upload Doc</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Documents</div>
+        <div class="stat-value">45</div>
+        <span class="stat-change up">+3 today</span>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Total Chunks</div>
+        <div class="stat-value">1,230</div>
+        <span class="stat-change up">+48 today</span>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Queries Today</div>
+        <div class="stat-value">287</div>
+        <span class="stat-change up">+12%</span>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Avg Latency</div>
+        <div class="stat-value">1.2s</div>
+        <span class="stat-change down">-8%</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Recent Documents</div>
+          <span class="badge badge-ghost">45 total</span>
+        </div>
+        <table class="table">
+          <thead><tr><th>Filename</th><th>Type</th><th>Chunks</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:600">治安管理处罚法.pdf</td><td><span class="badge badge-ghost">PDF</span></td><td>46</td><td><span class="badge badge-success">Indexed</span></td></tr>
+            <tr><td style="font-weight:600">AI应用工程师完整知识手册.md</td><td><span class="badge badge-ghost">MD</span></td><td>89</td><td><span class="badge badge-success">Indexed</span></td></tr>
+            <tr><td style="font-weight:600">HarnessEngineering总结.md</td><td><span class="badge badge-ghost">MD</span></td><td>34</td><td><span class="badge badge-success">Indexed</span></td></tr>
+            <tr><td style="font-weight:600">刑法.pdf</td><td><span class="badge badge-ghost">PDF</span></td><td>128</td><td><span class="badge badge-success">Indexed</span></td></tr>
+            <tr><td style="font-weight:600">新文档.docx</td><td><span class="badge badge-ghost">DOCX</span></td><td>—</td><td><span class="badge badge-warning">Pending</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">System Alerts</div>
+          <span class="badge badge-success">Healthy</span>
+        </div>
+        <div class="alert"><div class="dot green"></div><div><div class="alert-text">Index sync completed: +3 docs, 48 chunks</div><div class="alert-time">2 min ago</div></div></div>
+        <div class="alert"><div class="dot green"></div><div><div class="alert-text">Evaluation completed: accuracy 87.3%</div><div class="alert-time">1 hour ago</div></div></div>
+        <div class="alert"><div class="dot yellow"></div><div><div class="alert-text">BM25 index rebuild triggered</div><div class="alert-time">3 hours ago</div></div></div>
+        <div class="alert"><div class="dot green"></div><div><div class="alert-text">File watcher started</div><div class="alert-time">5 hours ago</div></div></div>
+        <div class="alert"><div class="dot red"></div><div><div class="alert-text">OCR failed on test_ocr.png</div><div class="alert-time">Yesterday</div></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+function toggleTheme() {
+  var html = document.documentElement;
+  var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  document.getElementById('theme-icon').innerHTML = next === 'dark' ? '&#9790;' : '&#9728;';
+  localStorage.setItem('theme', next);
+}
+(function() {
+  var saved = localStorage.getItem('theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    document.getElementById('theme-icon').innerHTML = saved === 'dark' ? '&#9790;' : '&#9728;';
+  }
+})();
+</script>
+</body>
+</html>

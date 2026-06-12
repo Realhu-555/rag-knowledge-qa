@@ -106,6 +106,12 @@ class ChromaBackend(VectorStoreBackend):
         collection_name: str | None = None,
     ) -> None:
         col = self._get_collection(collection_name)
+        # ChromaDB 只接受 str/int/float/bool，过滤掉 None 和不支持的类型
+        if metadatas is not None:
+            metadatas = [
+                {k: v for k, v in m.items() if v is not None and isinstance(v, (str, int, float, bool))}
+                for m in metadatas
+            ]
         col.add(ids=ids, documents=documents, embeddings=embeddings, metadatas=metadatas)
 
     def query(

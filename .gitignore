@@ -4,4 +4,10 @@ __pycache__/
 chroma_db/
 .env
 *.db
-# data/目录保留，但个人文档不提交
+data/
+images/
+models/
+_debug_chunks.txt
+*.log
+.pytest_cache/
+.ruff_cache/

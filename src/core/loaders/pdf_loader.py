@@ -8,15 +8,16 @@ def _extract_table_text(table) -> str:
     """将pdfplumber表格转换为Markdown格式
 
     Args:
-        table: pdfplumber表格对象
+        table: pdfplumber表格（list of rows），每行是 cell 列表
 
     Returns:
         Markdown格式的表格字符串
     """
-    if not table or not table.get('data'):
+    if not table:
         return ""
 
-    rows = table['data']
+    # pdfplumber extract_tables() 直接返回 list[list[list|None]]
+    rows = table
     if not rows:
         return ""
 

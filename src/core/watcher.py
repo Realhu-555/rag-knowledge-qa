@@ -107,12 +107,32 @@ class FileWatcher:
         logger.info("文件监听器已停止")
 
     def _on_change(self):
-        """文件变化回调：执行增量索引"""
+        """文件变化回调：执行增量索引，并通过 WebSocket 广播结果"""
+        import asyncio
         from src.core.incremental_indexer import IncrementalIndexer
+        from src.core.data_monitor import get_data_monitor
 
         indexer = IncrementalIndexer()
+        monitor = get_data_monitor()
+
+        # 广播：索引开始
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(monitor.on_file_change([], "indexing"))
+        except RuntimeError:
+            pass
+
         stats = indexer.sync()
         logger.info("增量索引完成: %s", stats)
+
+        # 广播：索引完成
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(monitor.on_index_complete(stats))
+        except RuntimeError:
+            pass
 
 
 # 全局单例
