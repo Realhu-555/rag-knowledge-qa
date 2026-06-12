@@ -33,7 +33,7 @@ DEEPSEEK_MODEL = OPENAI_MODEL
 
 # Embedding配置
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local")  # local 或 api
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/BAAI/bge-m3")
 
 # 切片配置
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
@@ -88,6 +88,9 @@ VECTOR_STORE_BACKEND = os.getenv("VECTOR_STORE_BACKEND", "chroma")  # chroma / m
 BATCH_EMBEDDING_SIZE = int(os.getenv("BATCH_EMBEDDING_SIZE", "100"))  # 批量Embedding大小
 PARALLEL_LOAD_WORKERS = int(os.getenv("PARALLEL_LOAD_WORKERS", "4"))  # 并行加载线程数
 DEDUP_SIMILARITY_THRESHOLD = float(os.getenv("DEDUP_SIMILARITY_THRESHOLD", "0.95"))  # 相似度去重阈值
+
+# 文件监听器配置
+WATCHER_AUTO_START = os.getenv("WATCHER_AUTO_START", "false").lower() == "true"  # 服务启动时自动启动监听
 
 # M7: 多模态能力配置（默认关闭）
 MULTIMODAL_ENABLED = os.getenv("MULTIMODAL_ENABLED", "false").lower() == "true"
