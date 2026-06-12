@@ -13,9 +13,9 @@
 | Ruff lint | 0 errors |
 | Pre-commit | ✅ ruff check + ruff format |
 | AGENTS.md | ✅ 已配置 |
-| SPEC 对齐 | ❌ 5 处脱节 |
-| Docker | ❌ 无 |
-| 限流持久化 | ❌ 内存，重启丢失 |
+| SPEC 对齐 | ✅ 已对齐 |
+| Docker | ✅ Dockerfile + docker-compose |
+| 限流持久化 | ✅ SQLite WAL |
 | OCR | ⚠️ 代码有，未启用 |
 
 ## 已完成的修复
