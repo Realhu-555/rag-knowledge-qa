@@ -46,6 +46,7 @@ USE_HYBRID_RETRIEVAL = os.getenv("USE_HYBRID_RETRIEVAL", "true").lower() == "tru
 USE_QUERY_EXPANSION = os.getenv("USE_QUERY_EXPANSION", "false").lower() == "true"
 USE_HYDE = os.getenv("USE_HYDE", "false").lower() == "true"
 USE_RERANKER = os.getenv("USE_RERANKER", "false").lower() == "true"
+USE_QUERY_CORRECTION = os.getenv("USE_QUERY_CORRECTION", "true").lower() == "true"  # 查询纠错
 
 # M5: 检索优化配置
 HYBRID_VECTOR_WEIGHT = float(os.getenv("HYBRID_VECTOR_WEIGHT", "1.0"))
@@ -90,7 +91,7 @@ PARALLEL_LOAD_WORKERS = int(os.getenv("PARALLEL_LOAD_WORKERS", "4"))  # 并行�
 DEDUP_SIMILARITY_THRESHOLD = float(os.getenv("DEDUP_SIMILARITY_THRESHOLD", "0.95"))  # 相似度去重阈值
 
 # 文件监听器配置
-WATCHER_AUTO_START = os.getenv("WATCHER_AUTO_START", "false").lower() == "true"  # 服务启动时自动启动监听
+WATCHER_AUTO_START = os.getenv("WATCHER_AUTO_START", "true").lower() == "true"  # 服务启动时自动启动监听
 
 # M7: 多模态能力配置（默认关闭）
 MULTIMODAL_ENABLED = os.getenv("MULTIMODAL_ENABLED", "false").lower() == "true"

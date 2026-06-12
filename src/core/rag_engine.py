@@ -17,6 +17,7 @@ from src.core.query_cache import QueryCache
 from src.config import (
     USE_INTENT_CLASSIFICATION,
     FOLLOWUP_SCORE_THRESHOLD,
+    USE_QUERY_CORRECTION,
 )
 
 logger = logging.getLogger(__name__)
@@ -197,15 +198,22 @@ class RAGEngine:
             entities = []
             hyde_query = None
 
+            # 1.1 查询纠错（修正错别字）
+            corrected_question = question
+            if USE_QUERY_CORRECTION:
+                corrected_question = self.query_understander.correct_query(question)
+                if corrected_question != question:
+                    expanded_queries = [corrected_question]
+
             if self.use_query_expansion:
-                expansion = self.query_understander.expand_query(question)
+                expansion = self.query_understander.expand_query(corrected_question)
                 expanded_queries = expansion.expanded_queries
                 entities = expansion.entities
 
             # HyDE：用假设回答做向量检索
             hyde_results = []
             if self.use_hyde:
-                hyde_text = self.query_understander.generate_hyde(question)
+                hyde_text = self.query_understander.generate_hyde(corrected_question)
                 hyde_embedding = self.embedder.embed_single(hyde_text)
                 hyde_retrieval = self.vector_store.query(
                     query_embedding=hyde_embedding,

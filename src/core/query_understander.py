@@ -95,6 +95,42 @@ class QueryUnderstander:
             intent=""
         )
 
+    def correct_query(self, query: str) -> str:
+        """纠错：修正用户输入的错别字
+
+        用 LLM 判断查询中是否有错别字，如果有则返回修正后的版本。
+        没有错别字时返回原始查询。
+        """
+        self._init_client()
+
+        prompt = f"""请检查以下用户查询中是否有错别字或谐音字，如果有请修正，如果没有请原样返回。
+
+用户查询：{query}
+
+要求：
+1. 只修正明显的错别字和同音错字（如"心法"→"新法"、"新发"→"新法"）
+2. 不要改变用户的意思
+3. 如果没有错别字，原样返回
+4. 只返回修正后的查询文本，不要加任何解释"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": "你是一个中文纠错专家，擅长识别同音字、形近字错误。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.1,
+                max_tokens=200
+            )
+            corrected = response.choices[0].message.content.strip()
+            if corrected and corrected != query:
+                logger.info("查询纠错: '%s' → '%s'", query, corrected)
+            return corrected if corrected else query
+        except Exception as e:
+            logger.warning("查询纠错失败: %s，返回原始查询", e)
+            return query
+
     def generate_hyde(self, query: str) -> str:
         """HyDE：生成假设性文档"""
         self._init_client()

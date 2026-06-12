@@ -10,7 +10,9 @@ _MOCK_MODULES = [
     "sentence_transformers.cross_encoder.CrossEncoder",
     "rank_bm25",
 ]
+_original_modules = {}
 for _mod_name in _MOCK_MODULES:
+    _original_modules[_mod_name] = sys.modules.get(_mod_name)
     if _mod_name not in sys.modules:
         sys.modules[_mod_name] = Mock()
 
@@ -44,10 +46,16 @@ def _setup_engine(overrides: dict | None = None):
         entities=[],
         intent="",
     )
+    # correct_query 默认返回原始查询（不纠错）
+    mocks["query_understander"].return_value.correct_query.side_effect = lambda q: q
 
-    # Retriever.retrieve 返回一条结果
-    mock_result = Mock(content="参考内容", metadata={"source": "test.md"}, score=0.9)
-    mocks["retriever"].return_value.retrieve.return_value = [mock_result]
+    # Retriever.retrieve 返回一条结果（走普通 Retriever 路径，mock vector_store.query）
+    mocks["vector_store"].return_value.query.return_value = {
+        "documents": [["参考内容"]],
+        "metadatas": [[{"source": "test.md"}]],
+        "distances": [[0.2]],
+    }
+    mocks["embedder"].return_value.embed_single.return_value = [0.1] * 384
 
     # Generator.generate 返回固定回答
     mocks["generator"].return_value.generate.return_value = {
@@ -65,6 +73,9 @@ def _setup_engine(overrides: dict | None = None):
                 mocks[key].return_value.configure_mock(**value)
 
     engine = RAGEngine(use_query_expansion=False, use_hyde=False, use_reranker=False)
+    # 强制使用普通 Retriever，避免 BM25 mock 问题
+    from src.core.retriever import Retriever
+    engine.retriever = Retriever(mocks["vector_store"].return_value, mocks["embedder"].return_value)
     return engine, mocks, patches
 
 
@@ -96,7 +107,11 @@ class TestEmptyQueryReturnsNotFound:
         engine, mocks, patches = _setup_engine()
         try:
             # 检索器对空查询返回空结果
-            mocks["retriever"].return_value.retrieve.return_value = []
+            mocks["vector_store"].return_value.query.return_value = {
+                "documents": [[]],
+                "metadatas": [[]],
+                "distances": [[]],
+            }
 
             response = engine.query("")
 
@@ -104,3 +119,5 @@ class TestEmptyQueryReturnsNotFound:
             assert "未找到" in response.answer or "抱歉" in response.answer
         finally:
             _stop_all(patches)
+
+
