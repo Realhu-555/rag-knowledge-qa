@@ -209,6 +209,16 @@ try:
 except Exception as e:
     logger.warning("评测调度器启动失败: %s", e)
 
+# 文件监听器（可选自动启动）
+from src.config import WATCHER_AUTO_START
+if WATCHER_AUTO_START:
+    try:
+        from src.core.watcher import get_watcher
+        get_watcher().start()
+        logger.info("文件监听器已自动启动")
+    except Exception as e:
+        logger.warning("文件监听器启动失败: %s", e)
+
 
 if __name__ == "__main__":
     import uvicorn

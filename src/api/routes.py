@@ -476,6 +476,44 @@ async def index_status(user: dict = Depends(get_current_user)):
 
 
 # ===================================================================
+# 文件监听器控制（仅 admin）
+# ===================================================================
+
+@router.post("/index/watcher/start")
+async def watcher_start(user: dict = Depends(require_role("admin")), request: Request = None):
+    """启动文件监听器"""
+    from src.core.watcher import get_watcher
+    watcher = get_watcher()
+    if watcher.is_running:
+        return {"status": "already_running", "message": "文件监听器已在运行"}
+    watcher.start()
+    log_audit(user["id"], "watcher_start", "system", "",
+              ip_address=_get_client_ip(request) if request else "")
+    return {"status": "started", "message": "文件监听器已启动"}
+
+
+@router.post("/index/watcher/stop")
+async def watcher_stop(user: dict = Depends(require_role("admin")), request: Request = None):
+    """停止文件监听器"""
+    from src.core.watcher import get_watcher
+    watcher = get_watcher()
+    if not watcher.is_running:
+        return {"status": "not_running", "message": "文件监听器未在运行"}
+    watcher.stop()
+    log_audit(user["id"], "watcher_stop", "system", "",
+              ip_address=_get_client_ip(request) if request else "")
+    return {"status": "stopped", "message": "文件监听器已停止"}
+
+
+@router.get("/index/watcher/status")
+async def watcher_status(user: dict = Depends(get_current_user)):
+    """查看文件监听器状态"""
+    from src.core.watcher import get_watcher
+    watcher = get_watcher()
+    return {"running": watcher.is_running}
+
+
+# ===================================================================
 # 审计日志查询（仅 admin）
 # ===================================================================
 
